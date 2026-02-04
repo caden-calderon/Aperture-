@@ -1,0 +1,1708 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Context Forge</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@300;400;500;600&family=Outfit:wght@300;400;500;600;700&display=swap');
+
+  :root {
+    --bg-deep: #0a0a0c;
+    --bg-surface: #111116;
+    --bg-elevated: #1a1a22;
+    --bg-hover: #22222e;
+    --border-dim: #2a2a38;
+    --border-active: #4a4a6a;
+    --text-primary: #e8e8f0;
+    --text-secondary: #8888a0;
+    --text-dim: #555568;
+    --accent-primacy: #4ecdc4;
+    --accent-recency: #ff6b9d;
+    --accent-middle: #ffd93d;
+    --accent-system: #6c5ce7;
+    --accent-tool: #a29bfe;
+    --accent-user: #74b9ff;
+    --accent-assistant: #55efc4;
+    --accent-danger: #ff4757;
+    --accent-condense: #f093fb;
+    --token-used: #4ecdc4;
+    --token-free: #2a2a38;
+    --shadow-glow: rgba(78, 205, 196, 0.08);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Outfit', sans-serif;
+    background: var(--bg-deep);
+    color: var(--text-primary);
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── Header ── */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 20px;
+    background: var(--bg-surface);
+    border-bottom: 1px solid var(--border-dim);
+    flex-shrink: 0;
+    z-index: 100;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .logo-icon {
+    width: 28px;
+    height: 28px;
+    background: linear-gradient(135deg, var(--accent-primacy), var(--accent-recency));
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--bg-deep);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .logo-text {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    color: var(--text-primary);
+  }
+
+  .logo-version {
+    font-size: 10px;
+    color: var(--text-dim);
+    font-weight: 400;
+    margin-left: 2px;
+  }
+
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /* ── Buttons ── */
+  .btn {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    padding: 6px 12px;
+    border-radius: 5px;
+    border: 1px solid var(--border-dim);
+    background: var(--bg-elevated);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    white-space: nowrap;
+  }
+
+  .btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+    border-color: var(--border-active);
+  }
+
+  .btn-accent {
+    border-color: rgba(78, 205, 196, 0.3);
+    color: var(--accent-primacy);
+  }
+
+  .btn-accent:hover {
+    background: rgba(78, 205, 196, 0.1);
+    border-color: var(--accent-primacy);
+  }
+
+  .btn-danger {
+    border-color: rgba(255, 71, 87, 0.3);
+    color: var(--accent-danger);
+  }
+
+  .btn-danger:hover {
+    background: rgba(255, 71, 87, 0.1);
+    border-color: var(--accent-danger);
+  }
+
+  .btn-condense {
+    border-color: rgba(240, 147, 251, 0.3);
+    color: var(--accent-condense);
+  }
+
+  .btn-condense:hover {
+    background: rgba(240, 147, 251, 0.1);
+    border-color: var(--accent-condense);
+  }
+
+  .btn kbd {
+    font-size: 9px;
+    padding: 1px 4px;
+    border-radius: 3px;
+    background: var(--bg-deep);
+    border: 1px solid var(--border-dim);
+    color: var(--text-dim);
+  }
+
+  /* ── Token Budget Bar ── */
+  .token-bar-container {
+    padding: 10px 20px;
+    background: var(--bg-surface);
+    border-bottom: 1px solid var(--border-dim);
+    flex-shrink: 0;
+  }
+
+  .token-bar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+  }
+
+  .token-bar-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .token-bar-stats {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-secondary);
+    display: flex;
+    gap: 16px;
+  }
+
+  .token-stat-value {
+    color: var(--text-primary);
+    font-weight: 600;
+  }
+
+  .token-bar-track {
+    height: 6px;
+    background: var(--token-free);
+    border-radius: 3px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .token-bar-segments {
+    display: flex;
+    height: 100%;
+    transition: all 0.3s ease;
+  }
+
+  .token-segment {
+    height: 100%;
+    transition: width 0.3s ease;
+    position: relative;
+  }
+
+  .token-segment::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: var(--bg-deep);
+  }
+
+  .token-bar-zones {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 4px;
+  }
+
+  .zone-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .zone-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+  }
+
+  /* ── Main Layout ── */
+  .main-layout {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    width: 240px;
+    background: var(--bg-surface);
+    border-right: 1px solid var(--border-dim);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+  }
+
+  .sidebar-section {
+    padding: 12px;
+    border-bottom: 1px solid var(--border-dim);
+  }
+
+  .sidebar-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+  }
+
+  .snapshot-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .snapshot-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.1s ease;
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+
+  .snapshot-item:hover {
+    background: var(--bg-elevated);
+    color: var(--text-primary);
+  }
+
+  .snapshot-item.active {
+    background: var(--bg-elevated);
+    color: var(--accent-primacy);
+    border: 1px solid rgba(78, 205, 196, 0.2);
+  }
+
+  .snapshot-meta {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    color: var(--text-dim);
+  }
+
+  .snapshot-actions {
+    display: flex;
+    gap: 4px;
+    opacity: 0;
+    transition: opacity 0.1s;
+  }
+
+  .snapshot-item:hover .snapshot-actions {
+    opacity: 1;
+  }
+
+  .snapshot-action-btn {
+    width: 20px;
+    height: 20px;
+    border-radius: 3px;
+    border: none;
+    background: var(--bg-hover);
+    color: var(--text-dim);
+    cursor: pointer;
+    font-size: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .snapshot-action-btn:hover {
+    color: var(--text-primary);
+    background: var(--border-dim);
+  }
+
+  /* Filter checkboxes */
+  .filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .filter-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 6px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.1s;
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+
+  .filter-item:hover {
+    background: var(--bg-elevated);
+  }
+
+  .filter-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+
+  .filter-tokens {
+    margin-left: auto;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    color: var(--text-dim);
+  }
+
+  /* ── Context Area ── */
+  .context-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .context-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 16px;
+    background: var(--bg-surface);
+    border-bottom: 1px solid var(--border-dim);
+    flex-shrink: 0;
+  }
+
+  .toolbar-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .toolbar-right {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .selection-count {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+
+  .selection-count strong {
+    color: var(--accent-primacy);
+    font-weight: 600;
+  }
+
+  /* ── Zone Containers ── */
+  .zones-container {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    scroll-behavior: smooth;
+  }
+
+  .zones-container::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .zones-container::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .zones-container::-webkit-scrollbar-thumb {
+    background: var(--border-dim);
+    border-radius: 3px;
+  }
+
+  .zone {
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid var(--border-dim);
+    transition: border-color 0.2s;
+  }
+
+  .zone.drag-over {
+    border-color: var(--accent-primacy);
+    box-shadow: 0 0 20px var(--shadow-glow);
+  }
+
+  .zone-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: var(--bg-elevated);
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .zone-header-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .zone-indicator {
+    width: 3px;
+    height: 16px;
+    border-radius: 2px;
+  }
+
+  .zone-name {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--text-secondary);
+  }
+
+  .zone-token-count {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+  }
+
+  .zone-blocks {
+    display: flex;
+    flex-direction: column;
+    min-height: 8px;
+  }
+
+  /* ── Context Blocks ── */
+  .context-block {
+    display: flex;
+    align-items: stretch;
+    border-bottom: 1px solid rgba(42, 42, 56, 0.5);
+    transition: all 0.15s ease;
+    position: relative;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .context-block:last-child {
+    border-bottom: none;
+  }
+
+  .context-block:hover {
+    background: var(--bg-hover);
+  }
+
+  .context-block.selected {
+    background: rgba(78, 205, 196, 0.06);
+  }
+
+  .context-block.selected::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: var(--accent-primacy);
+  }
+
+  .context-block.condensed {
+    opacity: 0.7;
+    background: rgba(240, 147, 251, 0.04);
+  }
+
+  .context-block.condensed::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: var(--accent-condense);
+  }
+
+  .context-block.removing {
+    animation: slideOut 0.25s ease forwards;
+  }
+
+  @keyframes slideOut {
+    to {
+      opacity: 0;
+      transform: translateX(40px);
+      max-height: 0;
+      padding-top: 0;
+      padding-bottom: 0;
+      margin: 0;
+    }
+  }
+
+  .block-select {
+    width: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .block-checkbox {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    border: 1px solid var(--border-dim);
+    background: var(--bg-deep);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.1s;
+  }
+
+  .block-checkbox.checked {
+    background: var(--accent-primacy);
+    border-color: var(--accent-primacy);
+  }
+
+  .block-checkbox.checked::after {
+    content: '✓';
+    font-size: 9px;
+    color: var(--bg-deep);
+    font-weight: 700;
+  }
+
+  .block-type-indicator {
+    width: 4px;
+    flex-shrink: 0;
+  }
+
+  .block-content {
+    flex: 1;
+    padding: 8px 12px;
+    min-width: 0;
+  }
+
+  .block-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+  }
+
+  .block-role {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 1px 6px;
+    border-radius: 3px;
+  }
+
+  .block-role.system {
+    background: rgba(108, 92, 231, 0.15);
+    color: var(--accent-system);
+  }
+  .block-role.user {
+    background: rgba(116, 185, 255, 0.15);
+    color: var(--accent-user);
+  }
+  .block-role.assistant {
+    background: rgba(85, 239, 196, 0.15);
+    color: var(--accent-assistant);
+  }
+  .block-role.tool_use {
+    background: rgba(162, 155, 254, 0.12);
+    color: var(--accent-tool);
+  }
+  .block-role.tool_result {
+    background: rgba(162, 155, 254, 0.12);
+    color: var(--accent-tool);
+  }
+
+  .block-index {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    color: var(--text-dim);
+  }
+
+  .block-tokens {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    color: var(--text-dim);
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .condensed-badge {
+    font-size: 8px;
+    padding: 0px 4px;
+    border-radius: 2px;
+    background: rgba(240, 147, 251, 0.15);
+    color: var(--accent-condense);
+    font-family: 'IBM Plex Mono', monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .block-preview {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    line-height: 1.5;
+    color: var(--text-secondary);
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    word-break: break-word;
+  }
+
+  .block-preview.expanded {
+    -webkit-line-clamp: unset;
+    max-height: 400px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+  }
+
+  .block-meta {
+    width: 80px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    flex-shrink: 0;
+    padding: 4px;
+  }
+
+  .pin-btn {
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-size: 11px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.1s;
+  }
+
+  .pin-btn:hover {
+    background: var(--bg-hover);
+    border-color: var(--border-dim);
+    color: var(--text-secondary);
+  }
+
+  .pin-btn.pinned-top {
+    color: var(--accent-primacy);
+    border-color: rgba(78, 205, 196, 0.3);
+  }
+
+  .pin-btn.pinned-bottom {
+    color: var(--accent-recency);
+    border-color: rgba(255, 107, 157, 0.3);
+  }
+
+  /* ── Drag Trash Zone ── */
+  .trash-zone {
+    position: fixed;
+    bottom: -60px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 300px;
+    height: 50px;
+    background: rgba(255, 71, 87, 0.1);
+    border: 2px dashed var(--accent-danger);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--accent-danger);
+    transition: bottom 0.3s ease, background 0.15s;
+    z-index: 200;
+    backdrop-filter: blur(10px);
+  }
+
+  .trash-zone.visible {
+    bottom: 20px;
+  }
+
+  .trash-zone.drag-hover {
+    background: rgba(255, 71, 87, 0.25);
+    transform: translateX(-50%) scale(1.05);
+  }
+
+  /* ── Expand Modal ── */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(4px);
+    z-index: 300;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+  }
+
+  .modal-overlay.active {
+    opacity: 1;
+    pointer-events: all;
+  }
+
+  .modal {
+    width: 700px;
+    max-height: 80vh;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-dim);
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transform: translateY(10px);
+    transition: transform 0.2s;
+  }
+
+  .modal-overlay.active .modal {
+    transform: translateY(0);
+  }
+
+  .modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border-dim);
+  }
+
+  .modal-header-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .modal-body {
+    padding: 16px;
+    overflow-y: auto;
+    flex: 1;
+  }
+
+  .modal-body pre {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--text-secondary);
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .modal-footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 10px 16px;
+    border-top: 1px solid var(--border-dim);
+  }
+
+  /* ── Toast ── */
+  .toast-container {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 400;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .toast {
+    padding: 8px 14px;
+    border-radius: 6px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-dim);
+    color: var(--text-secondary);
+    animation: toastIn 0.2s ease, toastOut 0.2s ease 2.5s forwards;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  @keyframes toastIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes toastOut {
+    from { opacity: 1; }
+    to { opacity: 0; transform: translateY(-5px); }
+  }
+
+  /* ── Drop indicator ── */
+  .drop-indicator {
+    height: 2px;
+    background: var(--accent-primacy);
+    margin: 0;
+    border-radius: 1px;
+    box-shadow: 0 0 8px var(--accent-primacy);
+    transition: opacity 0.1s;
+  }
+
+  /* ── Misc ── */
+  .empty-zone {
+    padding: 20px;
+    text-align: center;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+    font-style: italic;
+  }
+
+  .kbd-hint {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    color: var(--text-dim);
+    padding: 2px 5px;
+    background: var(--bg-deep);
+    border: 1px solid var(--border-dim);
+    border-radius: 3px;
+  }
+
+  /* Import/Load section */
+  .import-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    color: var(--text-dim);
+    padding: 40px;
+  }
+
+  .import-dropzone {
+    width: 100%;
+    max-width: 500px;
+    height: 200px;
+    border: 2px dashed var(--border-dim);
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  .import-dropzone:hover {
+    border-color: var(--accent-primacy);
+    background: rgba(78, 205, 196, 0.04);
+  }
+
+  .import-dropzone-icon {
+    font-size: 32px;
+    opacity: 0.4;
+  }
+
+  .import-dropzone-text {
+    font-size: 13px;
+    color: var(--text-secondary);
+  }
+
+  .import-dropzone-hint {
+    font-size: 10px;
+    color: var(--text-dim);
+  }
+
+  .import-or {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">
+    <div class="logo-icon">⚒</div>
+    <span class="logo-text">CONTEXT FORGE <span class="logo-version">v0.1</span></span>
+  </div>
+  <div class="header-actions">
+    <button class="btn" onclick="loadDemoData()" title="Load demo context for testing">◆ Load Demo</button>
+    <button class="btn" onclick="importContext()" title="Import a context JSON file">↑ Import JSON</button>
+    <button class="btn btn-accent" onclick="exportContext()" title="Export trimmed context">↓ Export</button>
+  </div>
+</div>
+
+<div class="token-bar-container" id="tokenBar">
+  <div class="token-bar-header">
+    <span class="token-bar-label">Token Budget</span>
+    <div class="token-bar-stats">
+      <span>Used: <span class="token-stat-value" id="tokensUsed">0</span></span>
+      <span>Free: <span class="token-stat-value" id="tokensFree">200,000</span></span>
+      <span>Limit: <span class="token-stat-value" id="tokensLimit">200,000</span></span>
+    </div>
+  </div>
+  <div class="token-bar-track">
+    <div class="token-bar-segments" id="tokenSegments"></div>
+  </div>
+  <div class="token-bar-zones">
+    <div class="zone-label"><div class="zone-dot" style="background:var(--accent-primacy)"></div> Primacy</div>
+    <div class="zone-label"><div class="zone-dot" style="background:var(--accent-middle)"></div> Middle</div>
+    <div class="zone-label"><div class="zone-dot" style="background:var(--accent-recency)"></div> Recency</div>
+  </div>
+</div>
+
+<div class="main-layout">
+  <div class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-title">Snapshots</div>
+      <div class="snapshot-list" id="snapshotList">
+        <div style="font-size:11px;color:var(--text-dim);padding:4px 8px;font-style:italic;">No snapshots yet</div>
+      </div>
+      <button class="btn" style="width:100%;justify-content:center;margin-top:8px;" onclick="createSnapshot()">+ Save Snapshot</button>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-title">Block Types</div>
+      <div class="filter-group" id="filterGroup"></div>
+    </div>
+
+    <div class="sidebar-section" style="border-bottom:none;flex:1;">
+      <div class="sidebar-title">Keyboard Shortcuts</div>
+      <div style="display:flex;flex-direction:column;gap:6px;font-size:11px;color:var(--text-dim);">
+        <div><span class="kbd-hint">A</span> Select all</div>
+        <div><span class="kbd-hint">Esc</span> Deselect</div>
+        <div><span class="kbd-hint">Del</span> Remove selected</div>
+        <div><span class="kbd-hint">C</span> Condense selected</div>
+        <div><span class="kbd-hint">E</span> Expand block</div>
+        <div><span class="kbd-hint">S</span> Save snapshot</div>
+        <div><span class="kbd-hint">Click</span> Select block</div>
+        <div><span class="kbd-hint">Shift+Click</span> Range select</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="context-area">
+    <div class="context-toolbar">
+      <div class="toolbar-left">
+        <div class="selection-count" id="selectionCount">
+          <strong>0</strong> blocks selected · <strong>0</strong> tokens
+        </div>
+      </div>
+      <div class="toolbar-right">
+        <button class="btn" onclick="selectAll()">Select All</button>
+        <button class="btn" onclick="deselectAll()">Deselect</button>
+        <button class="btn btn-condense" onclick="condenseSelected()">✦ Condense</button>
+        <button class="btn btn-danger" onclick="removeSelected()">✕ Remove</button>
+      </div>
+    </div>
+
+    <div class="zones-container" id="zonesContainer">
+      <div class="import-area" id="importArea">
+        <div class="import-dropzone" id="importDropzone">
+          <div class="import-dropzone-icon">⚒</div>
+          <div class="import-dropzone-text">Drop a context JSON file here</div>
+          <div class="import-dropzone-hint">Supports Claude Code conversation format</div>
+        </div>
+        <div class="import-or">or</div>
+        <button class="btn btn-accent" onclick="loadDemoData()" style="font-size:13px;padding:10px 24px;">Load Demo Context</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="trash-zone" id="trashZone">
+  <span>🗑</span> Drop to remove
+</div>
+
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-header-left">
+        <span class="block-role" id="modalRole"></span>
+        <span class="block-index" id="modalIndex"></span>
+        <span class="block-tokens" id="modalTokens"></span>
+      </div>
+      <button class="btn" onclick="closeModal()">✕ Close</button>
+    </div>
+    <div class="modal-body">
+      <pre id="modalContent"></pre>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="copyModalContent()">Copy to Clipboard</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<input type="file" id="fileInput" accept=".json" style="display:none" onchange="handleFileImport(event)">
+
+<script>
+// ── State ──
+let state = {
+  blocks: [],
+  selectedIds: new Set(),
+  snapshots: [],
+  tokenLimit: 200000,
+  expandedBlocks: new Set(),
+  lastSelectedIndex: null,
+  draggedBlockId: null,
+};
+
+// ── Token estimation (rough: ~4 chars per token) ──
+function estimateTokens(text) {
+  if (!text) return 0;
+  return Math.ceil(text.length / 3.8);
+}
+
+// ── Generate unique IDs ──
+let idCounter = 0;
+function genId() { return `block_${++idCounter}`; }
+
+// ── Parse context JSON into blocks ──
+function parseContextJSON(data) {
+  const blocks = [];
+  let messages = [];
+
+  if (Array.isArray(data)) {
+    messages = data;
+  } else if (data.messages) {
+    messages = data.messages;
+  } else if (data.conversation) {
+    messages = data.conversation;
+  }
+
+  messages.forEach((msg, i) => {
+    const role = msg.role || 'unknown';
+    let contentText = '';
+
+    if (typeof msg.content === 'string') {
+      contentText = msg.content;
+    } else if (Array.isArray(msg.content)) {
+      contentText = msg.content.map(c => {
+        if (typeof c === 'string') return c;
+        if (c.type === 'text') return c.text || '';
+        if (c.type === 'tool_use') return `[Tool: ${c.name}]\n${JSON.stringify(c.input, null, 2)}`;
+        if (c.type === 'tool_result') return typeof c.content === 'string' ? c.content : JSON.stringify(c.content);
+        return JSON.stringify(c);
+      }).join('\n');
+    }
+
+    const tokens = estimateTokens(contentText);
+    const subRole = Array.isArray(msg.content) ? msg.content.find(c => c.type === 'tool_use' || c.type === 'tool_result')?.type : null;
+
+    blocks.push({
+      id: genId(),
+      index: i,
+      role: subRole || role,
+      content: contentText,
+      tokens,
+      zone: 'middle',
+      pinned: null,
+      condensed: false,
+      originalContent: null,
+      originalTokens: null,
+    });
+  });
+
+  // Auto-assign zones: first block → primacy, last few → recency
+  if (blocks.length > 0) {
+    blocks[0].zone = 'primacy';
+    if (blocks.length > 2) {
+      blocks[blocks.length - 1].zone = 'recency';
+      blocks[blocks.length - 2].zone = 'recency';
+    }
+  }
+
+  return blocks;
+}
+
+// ── Demo Data ──
+function generateDemoData() {
+  return [
+    { role: 'system', content: 'You are Claude, an AI assistant made by Anthropic. You are helpful, harmless, and honest. You have access to tools for file operations, web search, and code execution.\n\nIMPORTANT: Always think step by step. When writing code, prefer clean and readable solutions. Follow the user\'s coding style conventions.\n\nCurrent working directory: /home/caden/projects/argus\nOS: Linux (CachyOS/Arch)\nShell: fish' },
+    { role: 'user', content: 'I need help setting up the Helios market data module for the Argus trading system. It should connect to the Alpaca API and stream real-time price data for a watchlist of symbols.' },
+    { role: 'assistant', content: 'I\'ll help you build the Helios market data module. Let me start by checking your existing project structure and then create the module.\n\nLet me look at what we have so far in the Argus project.' },
+    { role: 'assistant', content: [{ type: 'tool_use', name: 'bash', input: { command: 'find /home/caden/projects/argus/src -type f -name "*.py" | head -30' } }] },
+    { role: 'user', content: [{ type: 'tool_result', content: 'src/core/__init__.py\nsrc/core/config.py\nsrc/core/types.py\nsrc/iris/__init__.py\nsrc/iris/sentiment.py\nsrc/iris/news_feed.py\nsrc/athena/__init__.py\nsrc/athena/strategy.py\nsrc/hermes/__init__.py\nsrc/hermes/sms_gateway.py\nsrc/hermes/approval.py' }] },
+    { role: 'assistant', content: 'Good, I can see the project structure with the Greek mythology naming convention. You have Iris (sentiment/news), Athena (strategy), and Hermes (SMS/approval) modules. Now I\'ll create the Helios module for market data streaming.\n\nHere\'s what I\'m building:\n- `helios/stream.py` — WebSocket connection to Alpaca for real-time data\n- `helios/watchlist.py` — Symbol management and filtering\n- `helios/cache.py` — In-memory price cache with configurable history depth\n\nLet me check your config first to see how API credentials are handled.' },
+    { role: 'assistant', content: [{ type: 'tool_use', name: 'bash', input: { command: 'cat /home/caden/projects/argus/src/core/config.py' } }] },
+    { role: 'user', content: [{ type: 'tool_result', content: 'import os\nfrom dataclasses import dataclass\nfrom pathlib import Path\n\n@dataclass\nclass ArgusConfig:\n    alpaca_key: str = os.getenv("ALPACA_API_KEY", "")\n    alpaca_secret: str = os.getenv("ALPACA_SECRET_KEY", "")\n    alpaca_base_url: str = "https://paper-api.alpaca.markets"\n    twilio_sid: str = os.getenv("TWILIO_SID", "")\n    twilio_token: str = os.getenv("TWILIO_AUTH_TOKEN", "")\n    phone_from: str = os.getenv("PHONE_FROM", "")\n    phone_to: str = os.getenv("PHONE_TO", "")\n    db_path: Path = Path("data/argus.db")\n    log_level: str = "INFO"\n    max_position_size: float = 1000.0\n    approval_timeout: int = 300  # seconds\n\nconfig = ArgusConfig()' }] },
+    { role: 'assistant', content: 'The config already has Alpaca credentials set up. Now let me create the Helios module. I\'ll build it with async WebSocket streaming so it doesn\'t block the main event loop.\n\n```python\n# src/helios/__init__.py\nfrom .stream import MarketStream\nfrom .watchlist import Watchlist\nfrom .cache import PriceCache\n\n__all__ = ["MarketStream", "Watchlist", "PriceCache"]\n```\n\nHere\'s the main streaming module:\n\n```python\n# src/helios/stream.py\nimport asyncio\nimport json\nimport logging\nfrom typing import Callable, Optional\nimport websockets\nfrom ..core.config import config\n\nlogger = logging.getLogger("argus.helios")\n\nclass MarketStream:\n    WS_URL = "wss://stream.data.alpaca.markets/v2/iex"\n    \n    def __init__(self, on_bar: Optional[Callable] = None, on_trade: Optional[Callable] = None):\n        self.on_bar = on_bar\n        self.on_trade = on_trade\n        self._ws = None\n        self._running = False\n        self._subscriptions = set()\n    \n    async def connect(self):\n        self._ws = await websockets.connect(self.WS_URL)\n        auth_msg = {"action": "auth", "key": config.alpaca_key, "secret": config.alpaca_secret}\n        await self._ws.send(json.dumps(auth_msg))\n        response = await self._ws.recv()\n        logger.info(f"Auth response: {response}")\n        self._running = True\n    \n    async def subscribe(self, symbols: list[str]):\n        self._subscriptions.update(symbols)\n        if self._ws:\n            msg = {"action": "subscribe", "bars": symbols, "trades": symbols}\n            await self._ws.send(json.dumps(msg))\n            logger.info(f"Subscribed to {symbols}")\n    \n    async def listen(self):\n        while self._running:\n            try:\n                raw = await self._ws.recv()\n                messages = json.loads(raw)\n                for msg in messages:\n                    if msg.get("T") == "b" and self.on_bar:\n                        await self.on_bar(msg)\n                    elif msg.get("T") == "t" and self.on_trade:\n                        await self.on_trade(msg)\n            except websockets.ConnectionClosed:\n                logger.warning("Connection closed, reconnecting...")\n                await self._reconnect()\n    \n    async def _reconnect(self):\n        await asyncio.sleep(5)\n        await self.connect()\n        if self._subscriptions:\n            await self.subscribe(list(self._subscriptions))\n    \n    async def close(self):\n        self._running = False\n        if self._ws:\n            await self._ws.close()\n```\n\nWant me to continue with the watchlist manager and price cache, or do you want to adjust the streaming approach first?' },
+    { role: 'user', content: 'Looks great. Yeah continue with the watchlist and cache. Also can you add a method to get the latest snapshot of all prices — Athena will need that for strategy evaluation.' },
+    { role: 'assistant', content: 'On it. Here\'s the watchlist manager and the price cache with the snapshot method:\n\n```python\n# src/helios/watchlist.py\nfrom dataclasses import dataclass\nfrom typing import Optional\n\n@dataclass\nclass WatchItem:\n    symbol: str\n    weight: float = 1.0\n    sector: Optional[str] = None\n    active: bool = True\n\nclass Watchlist:\n    def __init__(self):\n        self._items: dict[str, WatchItem] = {}\n    \n    def add(self, symbol: str, weight: float = 1.0, sector: str = None):\n        self._items[symbol.upper()] = WatchItem(symbol=symbol.upper(), weight=weight, sector=sector)\n    \n    def remove(self, symbol: str):\n        self._items.pop(symbol.upper(), None)\n    \n    def get_active_symbols(self) -> list[str]:\n        return [item.symbol for item in self._items.values() if item.active]\n    \n    @property\n    def symbols(self) -> list[str]:\n        return list(self._items.keys())\n```\n\n```python\n# src/helios/cache.py\nimport time\nfrom collections import deque\nfrom dataclasses import dataclass, field\nfrom typing import Optional\n\n@dataclass\nclass PricePoint:\n    symbol: str\n    price: float\n    volume: int\n    timestamp: float\n    bid: Optional[float] = None\n    ask: Optional[float] = None\n\n@dataclass  \nclass SymbolCache:\n    history: deque = field(default_factory=lambda: deque(maxlen=1000))\n    last_update: float = 0\n    \n    @property\n    def latest(self) -> Optional[PricePoint]:\n        return self.history[-1] if self.history else None\n\nclass PriceCache:\n    def __init__(self, max_history: int = 1000):\n        self._cache: dict[str, SymbolCache] = {}\n        self._max_history = max_history\n    \n    def update(self, symbol: str, price: float, volume: int, timestamp: float = None, bid: float = None, ask: float = None):\n        if symbol not in self._cache:\n            self._cache[symbol] = SymbolCache(history=deque(maxlen=self._max_history))\n        point = PricePoint(symbol=symbol, price=price, volume=volume, timestamp=timestamp or time.time(), bid=bid, ask=ask)\n        self._cache[symbol].history.append(point)\n        self._cache[symbol].last_update = point.timestamp\n    \n    def get_latest(self, symbol: str) -> Optional[PricePoint]:\n        cache = self._cache.get(symbol.upper())\n        return cache.latest if cache else None\n    \n    def snapshot(self) -> dict[str, PricePoint]:\n        \"\"\"Get latest price for all tracked symbols — used by Athena for strategy eval.\"\"\"\n        return {sym: cache.latest for sym, cache in self._cache.items() if cache.latest}\n    \n    def get_history(self, symbol: str, n: int = 100) -> list[PricePoint]:\n        cache = self._cache.get(symbol.upper())\n        if not cache:\n            return []\n        return list(cache.history)[-n:]\n```\n\nThe `snapshot()` method returns a dict of symbol → latest PricePoint, which Athena can call whenever it needs to evaluate positions. Want me to wire this into the main Argus orchestrator?' },
+    { role: 'user', content: 'Actually hold on, let me think about this differently. What if instead of the Alpaca websocket we used a unified market data interface so we can swap providers? Like maybe Helios defines a protocol and we have adapters.' },
+    { role: 'assistant', content: 'That\'s a much better architecture — dependency inversion so Helios owns the interface and providers are pluggable. Here\'s how I\'d restructure it:\n\n```python\n# src/helios/protocol.py\nfrom abc import ABC, abstractmethod\nfrom typing import AsyncIterator, Protocol\nfrom .cache import PricePoint\n\nclass MarketDataProvider(ABC):\n    @abstractmethod\n    async def connect(self) -> None: ...\n    \n    @abstractmethod\n    async def subscribe(self, symbols: list[str]) -> None: ...\n    \n    @abstractmethod\n    async def stream(self) -> AsyncIterator[PricePoint]: ...\n    \n    @abstractmethod\n    async def disconnect(self) -> None: ...\n    \n    @property\n    @abstractmethod\n    def name(self) -> str: ...\n```\n\nThen the Alpaca implementation becomes:\n\n```python\n# src/helios/providers/alpaca.py\nclass AlpacaProvider(MarketDataProvider):\n    name = "alpaca"\n    # ... existing websocket logic wrapped in the protocol\n```\n\nAnd you could later add Polygon, Finnhub, or even a mock provider for testing:\n\n```python\n# src/helios/providers/mock.py\nclass MockProvider(MarketDataProvider):\n    \"\"\"Generates synthetic price data for backtesting\"\"\"\n```\n\nThe MarketStream class then accepts any provider and delegates to it. This way Athena doesn\'t care where the data comes from. Good thinking on this — it\'ll make testing way easier too.' }
+  ];
+}
+
+// ── Load demo ──
+function loadDemoData() {
+  const demo = generateDemoData();
+  state.blocks = parseContextJSON(demo);
+  state.selectedIds = new Set();
+  state.expandedBlocks = new Set();
+  state.lastSelectedIndex = null;
+  render();
+  toast('Demo context loaded');
+}
+
+// ── File Import ──
+function importContext() {
+  document.getElementById('fileInput').click();
+}
+
+function handleFileImport(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = JSON.parse(e.target.result);
+      state.blocks = parseContextJSON(data);
+      state.selectedIds = new Set();
+      render();
+      toast(`Imported ${state.blocks.length} blocks`);
+    } catch (err) {
+      toast('Failed to parse JSON: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+// ── Export ──
+function exportContext() {
+  if (state.blocks.length === 0) { toast('Nothing to export'); return; }
+  const messages = state.blocks.map(b => ({
+    role: b.role === 'tool_use' || b.role === 'tool_result' ? (b.role === 'tool_use' ? 'assistant' : 'user') : b.role,
+    content: b.content
+  }));
+  const blob = new Blob([JSON.stringify(messages, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `context-forge-export-${Date.now()}.json`;
+  a.click(); URL.revokeObjectURL(url);
+  toast('Context exported');
+}
+
+// ── Snapshots ──
+function createSnapshot() {
+  if (state.blocks.length === 0) { toast('No context to snapshot'); return; }
+  const snapshot = {
+    id: Date.now(),
+    name: `Snapshot ${state.snapshots.length + 1}`,
+    timestamp: new Date().toLocaleTimeString(),
+    blocks: JSON.parse(JSON.stringify(state.blocks)),
+    totalTokens: state.blocks.reduce((s, b) => s + b.tokens, 0),
+  };
+  state.snapshots.unshift(snapshot);
+  renderSnapshots();
+  toast(`Snapshot "${snapshot.name}" saved`);
+}
+
+function restoreSnapshot(id) {
+  const snap = state.snapshots.find(s => s.id === id);
+  if (!snap) return;
+  state.blocks = JSON.parse(JSON.stringify(snap.blocks));
+  state.selectedIds = new Set();
+  render();
+  toast(`Restored "${snap.name}"`);
+}
+
+function deleteSnapshot(id) {
+  state.snapshots = state.snapshots.filter(s => s.id !== id);
+  renderSnapshots();
+  toast('Snapshot deleted');
+}
+
+// ── Selection ──
+function toggleSelect(blockId, event) {
+  const blockIndex = state.blocks.findIndex(b => b.id === blockId);
+
+  if (event && event.shiftKey && state.lastSelectedIndex !== null) {
+    const start = Math.min(state.lastSelectedIndex, blockIndex);
+    const end = Math.max(state.lastSelectedIndex, blockIndex);
+    for (let i = start; i <= end; i++) {
+      state.selectedIds.add(state.blocks[i].id);
+    }
+  } else {
+    if (state.selectedIds.has(blockId)) {
+      state.selectedIds.delete(blockId);
+    } else {
+      state.selectedIds.add(blockId);
+    }
+  }
+
+  state.lastSelectedIndex = blockIndex;
+  render();
+}
+
+function selectAll() {
+  state.blocks.forEach(b => state.selectedIds.add(b.id));
+  render();
+}
+
+function deselectAll() {
+  state.selectedIds = new Set();
+  state.lastSelectedIndex = null;
+  render();
+}
+
+// ── Remove ──
+function removeSelected() {
+  if (state.selectedIds.size === 0) { toast('Nothing selected'); return; }
+  const count = state.selectedIds.size;
+  const removedTokens = state.blocks.filter(b => state.selectedIds.has(b.id)).reduce((s, b) => s + b.tokens, 0);
+
+  // Animate out
+  state.selectedIds.forEach(id => {
+    const el = document.querySelector(`[data-block-id="${id}"]`);
+    if (el) el.classList.add('removing');
+  });
+
+  setTimeout(() => {
+    state.blocks = state.blocks.filter(b => !state.selectedIds.has(b.id));
+    state.selectedIds = new Set();
+    render();
+    toast(`Removed ${count} blocks (${removedTokens.toLocaleString()} tokens freed)`);
+  }, 250);
+}
+
+function removeBlock(blockId) {
+  const block = state.blocks.find(b => b.id === blockId);
+  if (!block) return;
+  const el = document.querySelector(`[data-block-id="${blockId}"]`);
+  if (el) el.classList.add('removing');
+  setTimeout(() => {
+    state.blocks = state.blocks.filter(b => b.id !== blockId);
+    state.selectedIds.delete(blockId);
+    render();
+    toast(`Removed block (${block.tokens.toLocaleString()} tokens freed)`);
+  }, 250);
+}
+
+// ── Condense ──
+function condenseSelected() {
+  if (state.selectedIds.size === 0) { toast('Nothing selected'); return; }
+  const selectedBlocks = state.blocks.filter(b => state.selectedIds.has(b.id));
+
+  // Simulate LLM condensation — in production this would call an API
+  selectedBlocks.forEach(block => {
+    if (block.condensed) return;
+    block.originalContent = block.content;
+    block.originalTokens = block.tokens;
+    // Simulated compression: truncate to ~30% and add marker
+    const compressed = block.content.substring(0, Math.floor(block.content.length * 0.3));
+    block.content = `[CONDENSED] ${compressed}...`;
+    block.tokens = estimateTokens(block.content);
+    block.condensed = true;
+  });
+
+  const savedTokens = selectedBlocks.reduce((s, b) => s + ((b.originalTokens || 0) - b.tokens), 0);
+  state.selectedIds = new Set();
+  render();
+  toast(`Condensed ${selectedBlocks.length} blocks (${savedTokens.toLocaleString()} tokens saved)`);
+}
+
+function expandBlock(blockId) {
+  const block = state.blocks.find(b => b.id === blockId);
+  if (!block || !block.condensed) return;
+  block.content = block.originalContent;
+  block.tokens = block.originalTokens;
+  block.condensed = false;
+  block.originalContent = null;
+  block.originalTokens = null;
+  render();
+  toast('Block expanded to original');
+}
+
+// ── Pin to zone ──
+function cyclePin(blockId, event) {
+  event.stopPropagation();
+  const block = state.blocks.find(b => b.id === blockId);
+  if (!block) return;
+
+  if (block.zone === 'middle') {
+    block.zone = 'primacy';
+    block.pinned = 'top';
+  } else if (block.zone === 'primacy') {
+    block.zone = 'recency';
+    block.pinned = 'bottom';
+  } else {
+    block.zone = 'middle';
+    block.pinned = null;
+  }
+  render();
+}
+
+// ── Modal ──
+function openModal(blockId) {
+  const block = state.blocks.find(b => b.id === blockId);
+  if (!block) return;
+  document.getElementById('modalRole').textContent = block.role;
+  document.getElementById('modalRole').className = `block-role ${block.role}`;
+  document.getElementById('modalIndex').textContent = `#${block.index}`;
+  document.getElementById('modalTokens').textContent = `${block.tokens.toLocaleString()} tokens`;
+  document.getElementById('modalContent').textContent = block.content;
+  document.getElementById('modalOverlay').classList.add('active');
+}
+
+function closeModal(event) {
+  if (event && event.target !== event.currentTarget) return;
+  document.getElementById('modalOverlay').classList.remove('active');
+}
+
+function copyModalContent() {
+  const text = document.getElementById('modalContent').textContent;
+  navigator.clipboard.writeText(text);
+  toast('Copied to clipboard');
+}
+
+// ── Toast ──
+function toast(message) {
+  const container = document.getElementById('toastContainer');
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = message;
+  container.appendChild(t);
+  setTimeout(() => t.remove(), 3000);
+}
+
+// ── Drag & Drop ──
+let draggedId = null;
+
+function handleDragStart(event, blockId) {
+  draggedId = blockId;
+  event.dataTransfer.effectAllowed = 'move';
+  event.target.style.opacity = '0.5';
+  document.getElementById('trashZone').classList.add('visible');
+}
+
+function handleDragEnd(event) {
+  event.target.style.opacity = '1';
+  draggedId = null;
+  document.getElementById('trashZone').classList.remove('visible');
+  document.querySelectorAll('.zone').forEach(z => z.classList.remove('drag-over'));
+}
+
+function handleZoneDragOver(event) {
+  event.preventDefault();
+  event.currentTarget.classList.add('drag-over');
+}
+
+function handleZoneDragLeave(event) {
+  event.currentTarget.classList.remove('drag-over');
+}
+
+function handleZoneDrop(event, zoneName) {
+  event.preventDefault();
+  event.currentTarget.classList.remove('drag-over');
+  if (!draggedId) return;
+
+  const block = state.blocks.find(b => b.id === draggedId);
+  if (block) {
+    block.zone = zoneName;
+    block.pinned = zoneName === 'primacy' ? 'top' : zoneName === 'recency' ? 'bottom' : null;
+    render();
+    toast(`Moved to ${zoneName} zone`);
+  }
+}
+
+// Trash zone
+document.getElementById('trashZone').addEventListener('dragover', (e) => {
+  e.preventDefault();
+  e.currentTarget.classList.add('drag-hover');
+});
+
+document.getElementById('trashZone').addEventListener('dragleave', (e) => {
+  e.currentTarget.classList.remove('drag-hover');
+});
+
+document.getElementById('trashZone').addEventListener('drop', (e) => {
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-hover');
+  if (draggedId) removeBlock(draggedId);
+});
+
+// ── File Drop ──
+const importDropzone = document.getElementById('importDropzone');
+if (importDropzone) {
+  document.body.addEventListener('dragover', (e) => { e.preventDefault(); });
+  document.body.addEventListener('drop', (e) => {
+    e.preventDefault();
+    const file = e.dataTransfer?.files?.[0];
+    if (file && file.name.endsWith('.json')) {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        try {
+          const data = JSON.parse(ev.target.result);
+          state.blocks = parseContextJSON(data);
+          state.selectedIds = new Set();
+          render();
+          toast(`Imported ${state.blocks.length} blocks`);
+        } catch (err) {
+          toast('Failed to parse JSON');
+        }
+      };
+      reader.readAsText(file);
+    }
+  });
+}
+
+// ── Keyboard Shortcuts ──
+document.addEventListener('keydown', (e) => {
+  if (document.getElementById('modalOverlay').classList.contains('active')) {
+    if (e.key === 'Escape') closeModal();
+    return;
+  }
+
+  if (e.key === 'a' && !e.ctrlKey && !e.metaKey) { selectAll(); e.preventDefault(); }
+  if (e.key === 'Escape') { deselectAll(); }
+  if (e.key === 'Delete' || e.key === 'Backspace') { if (state.selectedIds.size > 0) { removeSelected(); e.preventDefault(); } }
+  if (e.key === 'c' && !e.ctrlKey && !e.metaKey) { condenseSelected(); }
+  if (e.key === 's' && !e.ctrlKey && !e.metaKey) { createSnapshot(); e.preventDefault(); }
+});
+
+// ── Render ──
+function render() {
+  renderZones();
+  renderTokenBar();
+  renderSelectionCount();
+  renderFilters();
+  renderSnapshots();
+}
+
+function renderZones() {
+  const container = document.getElementById('zonesContainer');
+
+  if (state.blocks.length === 0) {
+    container.innerHTML = `
+      <div class="import-area">
+        <div class="import-dropzone" onclick="importContext()">
+          <div class="import-dropzone-icon">⚒</div>
+          <div class="import-dropzone-text">Drop a context JSON file here</div>
+          <div class="import-dropzone-hint">Supports Claude Code conversation format</div>
+        </div>
+        <div class="import-or">or</div>
+        <button class="btn btn-accent" onclick="loadDemoData()" style="font-size:13px;padding:10px 24px;">Load Demo Context</button>
+      </div>`;
+    return;
+  }
+
+  const zones = [
+    { name: 'primacy', label: 'Primacy Zone', color: 'var(--accent-primacy)', desc: 'High recall — beginning of context' },
+    { name: 'middle', label: 'Middle Zone', color: 'var(--accent-middle)', desc: 'Lower recall — candidates for condensation/removal' },
+    { name: 'recency', label: 'Recency Zone', color: 'var(--accent-recency)', desc: 'High recall — end of context' },
+  ];
+
+  container.innerHTML = zones.map(zone => {
+    const zoneBlocks = state.blocks.filter(b => b.zone === zone.name);
+    const zoneTokens = zoneBlocks.reduce((s, b) => s + b.tokens, 0);
+
+    return `
+      <div class="zone" ondragover="handleZoneDragOver(event)" ondragleave="handleZoneDragLeave(event)" ondrop="handleZoneDrop(event, '${zone.name}')">
+        <div class="zone-header" onclick="this.parentElement.querySelector('.zone-blocks').style.display = this.parentElement.querySelector('.zone-blocks').style.display === 'none' ? 'flex' : 'none'">
+          <div class="zone-header-left">
+            <div class="zone-indicator" style="background:${zone.color}"></div>
+            <span class="zone-name">${zone.label}</span>
+            <span style="font-size:10px;color:var(--text-dim);font-family:'IBM Plex Mono',monospace;">${zoneBlocks.length} blocks</span>
+          </div>
+          <span class="zone-token-count">${zoneTokens.toLocaleString()} tokens</span>
+        </div>
+        <div class="zone-blocks">
+          ${zoneBlocks.length === 0
+            ? `<div class="empty-zone">Drop blocks here or pin to ${zone.name}</div>`
+            : zoneBlocks.map(block => renderBlock(block)).join('')
+          }
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function renderBlock(block) {
+  const isSelected = state.selectedIds.has(block.id);
+  const preview = block.content.length > 200 ? block.content.substring(0, 200) + '...' : block.content;
+
+  const typeColors = {
+    system: 'var(--accent-system)',
+    user: 'var(--accent-user)',
+    assistant: 'var(--accent-assistant)',
+    tool_use: 'var(--accent-tool)',
+    tool_result: 'var(--accent-tool)',
+  };
+
+  const pinIcon = block.pinned === 'top' ? '▲' : block.pinned === 'bottom' ? '▼' : '◇';
+  const pinClass = block.pinned === 'top' ? 'pinned-top' : block.pinned === 'bottom' ? 'pinned-bottom' : '';
+
+  return `
+    <div class="context-block ${isSelected ? 'selected' : ''} ${block.condensed ? 'condensed' : ''}"
+         data-block-id="${block.id}"
+         draggable="true"
+         ondragstart="handleDragStart(event, '${block.id}')"
+         ondragend="handleDragEnd(event)"
+         onclick="toggleSelect('${block.id}', event)">
+      <div class="block-select">
+        <div class="block-checkbox ${isSelected ? 'checked' : ''}" onclick="event.stopPropagation(); toggleSelect('${block.id}')"></div>
+      </div>
+      <div class="block-type-indicator" style="background:${typeColors[block.role] || 'var(--text-dim)'}"></div>
+      <div class="block-content" ondblclick="event.stopPropagation(); openModal('${block.id}')">
+        <div class="block-header">
+          <span class="block-role ${block.role}">${block.role}</span>
+          <span class="block-index">#${block.index}</span>
+          ${block.condensed ? '<span class="condensed-badge">condensed</span>' : ''}
+          <span class="block-tokens">
+            ${block.tokens.toLocaleString()} tok
+            ${block.condensed ? `<span style="text-decoration:line-through;opacity:0.5">${block.originalTokens?.toLocaleString()}</span>` : ''}
+          </span>
+        </div>
+        <div class="block-preview">${escapeHtml(preview)}</div>
+      </div>
+      <div class="block-meta">
+        <button class="pin-btn ${pinClass}" onclick="cyclePin('${block.id}', event)" title="Cycle zone: primacy → recency → middle">
+          ${pinIcon}
+        </button>
+        ${block.condensed ? `<button class="pin-btn" onclick="event.stopPropagation(); expandBlock('${block.id}')" title="Expand to original">↩</button>` : ''}
+      </div>
+    </div>`;
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+function renderTokenBar() {
+  const primacyTokens = state.blocks.filter(b => b.zone === 'primacy').reduce((s, b) => s + b.tokens, 0);
+  const middleTokens = state.blocks.filter(b => b.zone === 'middle').reduce((s, b) => s + b.tokens, 0);
+  const recencyTokens = state.blocks.filter(b => b.zone === 'recency').reduce((s, b) => s + b.tokens, 0);
+  const total = primacyTokens + middleTokens + recencyTokens;
+  const free = state.tokenLimit - total;
+
+  document.getElementById('tokensUsed').textContent = total.toLocaleString();
+  document.getElementById('tokensFree').textContent = free.toLocaleString();
+
+  const segments = document.getElementById('tokenSegments');
+  const pPct = (primacyTokens / state.tokenLimit * 100).toFixed(2);
+  const mPct = (middleTokens / state.tokenLimit * 100).toFixed(2);
+  const rPct = (recencyTokens / state.tokenLimit * 100).toFixed(2);
+
+  segments.innerHTML = `
+    <div class="token-segment" style="width:${pPct}%;background:var(--accent-primacy);" title="Primacy: ${primacyTokens.toLocaleString()} tokens"></div>
+    <div class="token-segment" style="width:${mPct}%;background:var(--accent-middle);" title="Middle: ${middleTokens.toLocaleString()} tokens"></div>
+    <div class="token-segment" style="width:${rPct}%;background:var(--accent-recency);" title="Recency: ${recencyTokens.toLocaleString()} tokens"></div>`;
+}
+
+function renderSelectionCount() {
+  const count = state.selectedIds.size;
+  const tokens = state.blocks.filter(b => state.selectedIds.has(b.id)).reduce((s, b) => s + b.tokens, 0);
+  document.getElementById('selectionCount').innerHTML = `<strong>${count}</strong> blocks selected · <strong>${tokens.toLocaleString()}</strong> tokens`;
+}
+
+function renderFilters() {
+  const types = {};
+  state.blocks.forEach(b => {
+    if (!types[b.role]) types[b.role] = { count: 0, tokens: 0 };
+    types[b.role].count++;
+    types[b.role].tokens += b.tokens;
+  });
+
+  const colors = {
+    system: 'var(--accent-system)',
+    user: 'var(--accent-user)',
+    assistant: 'var(--accent-assistant)',
+    tool_use: 'var(--accent-tool)',
+    tool_result: 'var(--accent-tool)',
+  };
+
+  document.getElementById('filterGroup').innerHTML = Object.entries(types).map(([role, info]) => `
+    <div class="filter-item" onclick="selectByType('${role}')">
+      <div class="filter-dot" style="background:${colors[role] || 'var(--text-dim)'}"></div>
+      ${role} <span style="color:var(--text-dim)">(${info.count})</span>
+      <span class="filter-tokens">${info.tokens.toLocaleString()}</span>
+    </div>`
+  ).join('');
+}
+
+function selectByType(role) {
+  const wasAllSelected = state.blocks.filter(b => b.role === role).every(b => state.selectedIds.has(b.id));
+  if (wasAllSelected) {
+    state.blocks.filter(b => b.role === role).forEach(b => state.selectedIds.delete(b.id));
+  } else {
+    state.blocks.filter(b => b.role === role).forEach(b => state.selectedIds.add(b.id));
+  }
+  render();
+}
+
+function renderSnapshots() {
+  const list = document.getElementById('snapshotList');
+  if (state.snapshots.length === 0) {
+    list.innerHTML = '<div style="font-size:11px;color:var(--text-dim);padding:4px 8px;font-style:italic;">No snapshots yet</div>';
+    return;
+  }
+  list.innerHTML = state.snapshots.map(snap => `
+    <div class="snapshot-item" onclick="restoreSnapshot(${snap.id})">
+      <div>
+        <div style="font-size:12px;">${snap.name}</div>
+        <div class="snapshot-meta">${snap.timestamp} · ${snap.totalTokens.toLocaleString()} tok</div>
+      </div>
+      <div class="snapshot-actions">
+        <button class="snapshot-action-btn" onclick="event.stopPropagation(); deleteSnapshot(${snap.id})" title="Delete">✕</button>
+      </div>
+    </div>`
+  ).join('');
+}
+
+// Initial render
+render();
+</script>
+</body>
+</html>

@@ -1,0 +1,222 @@
+@import "tailwindcss";
+
+/* ============================================================================
+   Aperture Design System
+   Halftone / Dithering / 1-Bit Aesthetic — Obra Dinn meets IDE
+   ============================================================================ */
+
+:root {
+  /* Background layers */
+  --bg-deep: #0a0a0c;
+  --bg-surface: #111116;
+  --bg-elevated: #1a1a22;
+  --bg-hover: #22222e;
+
+  /* Borders */
+  --border-dim: #2a2a38;
+  --border-active: #4a4a6a;
+
+  /* Text */
+  --text-primary: #e8e8f0;
+  --text-secondary: #8888a0;
+  --text-dim: #555568;
+
+  /* Zone accents */
+  --accent-primacy: #4ecdc4;
+  --accent-middle: #ffd93d;
+  --accent-recency: #ff6b9d;
+
+  /* Block type colors */
+  --accent-system: #6c5ce7;
+  --accent-user: #74b9ff;
+  --accent-assistant: #55efc4;
+  --accent-tool: #a29bfe;
+
+  /* Semantic colors */
+  --accent-danger: #ff4757;
+  --accent-condense: #f093fb;
+  --accent-success: #00d26a;
+  --accent-warning: #ffc048;
+
+  /* Token budget */
+  --token-used: #4ecdc4;
+  --token-free: #2a2a38;
+
+  /* Effects */
+  --shadow-glow: rgba(78, 205, 196, 0.08);
+
+  /* Halftone dot settings (for CSS patterns) */
+  --dot-size: 1px;
+  --dot-spacing: 4px;
+}
+
+/* ============================================================================
+   Base Styles
+   ============================================================================ */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: "Outfit", "Inter", system-ui, sans-serif;
+  background: var(--bg-deep);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ============================================================================
+   Typography
+   ============================================================================ */
+
+.font-mono {
+  font-family: "JetBrains Mono", "IBM Plex Mono", "Fira Code", monospace;
+}
+
+.font-display {
+  font-family: "Space Grotesk", "Outfit", system-ui, sans-serif;
+}
+
+/* ============================================================================
+   Scrollbar Styling
+   ============================================================================ */
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-dim);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--border-active);
+}
+
+/* ============================================================================
+   Halftone / Dithering Patterns
+   ============================================================================ */
+
+.halftone-sparse {
+  background-image: radial-gradient(
+    circle,
+    currentColor var(--dot-size),
+    transparent var(--dot-size)
+  );
+  background-size: calc(var(--dot-spacing) * 2) calc(var(--dot-spacing) * 2);
+}
+
+.halftone-medium {
+  background-image: radial-gradient(
+    circle,
+    currentColor var(--dot-size),
+    transparent var(--dot-size)
+  );
+  background-size: var(--dot-spacing) var(--dot-spacing);
+}
+
+.halftone-dense {
+  background-image: radial-gradient(
+    circle,
+    currentColor calc(var(--dot-size) * 1.5),
+    transparent calc(var(--dot-size) * 1.5)
+  );
+  background-size: calc(var(--dot-spacing) * 0.6) calc(var(--dot-spacing) * 0.6);
+}
+
+/* Dithered border effect */
+.border-dithered {
+  border-style: dashed;
+  border-image: repeating-linear-gradient(
+      90deg,
+      var(--border-dim) 0,
+      var(--border-dim) 2px,
+      transparent 2px,
+      transparent 4px
+    )
+    1;
+}
+
+/* ============================================================================
+   Animation Utilities
+   ============================================================================ */
+
+@keyframes dissolve {
+  from {
+    opacity: 1;
+    filter: blur(0);
+  }
+  to {
+    opacity: 0;
+    filter: blur(4px);
+    transform: scale(0.95);
+  }
+}
+
+@keyframes materialize {
+  from {
+    opacity: 0;
+    filter: blur(4px);
+    transform: scale(1.02);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: scale(1);
+  }
+}
+
+@keyframes pulse-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 var(--shadow-glow);
+  }
+  50% {
+    box-shadow: 0 0 20px 4px var(--shadow-glow);
+  }
+}
+
+.animate-dissolve {
+  animation: dissolve 0.25s ease forwards;
+}
+
+.animate-materialize {
+  animation: materialize 0.3s ease forwards;
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* ============================================================================
+   Focus States
+   ============================================================================ */
+
+:focus-visible {
+  outline: 2px solid var(--accent-primacy);
+  outline-offset: 2px;
+}
+
+/* ============================================================================
+   Selection
+   ============================================================================ */
+
+::selection {
+  background: rgba(78, 205, 196, 0.3);
+  color: var(--text-primary);
+}

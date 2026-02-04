@@ -1,0 +1,47 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+build/
+target/
+*.rs.bk
+
+# Tauri
+src-tauri/target/
+src-tauri/WixTools/
+src-tauri/Cargo.lock
+
+# Svelte
+.svelte-kit/
+.vercel/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Misc
+*.local
+.cache/
