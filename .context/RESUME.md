@@ -10,10 +10,10 @@
 | Field | Value |
 |-------|-------|
 | **Phase** | 0 — UI Foundation |
-| **Status** | PLANNING (setup complete, creating phase docs) |
+| **Status** | PLANNING COMPLETE (phase docs ready, awaiting review) |
 | **Last Updated** | 2026-02-04 |
 | **Blocking Issues** | None |
-| **Next Step** | Create detailed phase files for all phases (0-12) |
+| **Next Step** | Review phase docs, resolve ambiguities, then begin Phase 0 coding |
 
 ---
 
@@ -35,16 +35,24 @@
 
 | Phase | Name | Status | Focus |
 |-------|------|--------|-------|
-| 0 | UI Foundation | PLANNING | Tauri + Svelte 5 shell, full visual UI with mock data, animations, dithering effects |
-| 1 | Proxy Core | PENDING | HTTP intercept, request/response capture, SSE streaming, live UI updates |
-| 2 | Context Engine | PENDING | Parsing, zones, token counting, block management |
-| 3 | Dynamic Compression | PENDING | Multi-level compression, slider UI, LLM integration |
-| 4-12 | See APERTURE.md | PENDING | Heat maps, clustering, checkpoints, staging, analytics, plugins |
+| 0 | UI Foundation | PLANNING | Tauri + Svelte 5 shell, full visual UI with mock data, animations, dithering |
+| 1 | Proxy Core | PENDING | HTTP intercept, request/response capture, WebSocket events |
+| 2 | Context Engine | PENDING | Block management, zones, token counting, classification |
+| 3 | Dynamic Compression | PENDING | Multi-level compression, slider UI, async LLM |
+| 4 | Heat & Clustering | PENDING | Usage heat, position relevance, topic clusters, dedup |
+| 5 | Checkpoints & Forking | PENDING | Hard/soft checkpoints, forking, ghost blocks, trash |
+| 6 | Staging & Presets | PENDING | Pre-loaded injection, presets, templates, CLI, profiles |
+| 7 | Cleaner Sidecar | PENDING | Local model, tiered routing, dependency graph |
+| 8 | Search & NLP | PENDING | Full-text/semantic search, NL commands, annotations |
+| 9 | Analytics | PENDING | Cost tracking, timeline, replay, health score, warnings |
+| 10 | Task Integration | PENDING | TODO parsing, completion hooks, pre-fetching, pause/swap |
+| 11 | System Prompts & Git | PENDING | Prompt composition, A/B testing, git integration, learning |
+| 12 | Plugins & Ecosystem | PENDING | Plugin system, API, community, multi-agent (deferred) |
 
-**Phase docs**: `.context/phases/phase-{N}.md` — Create all before coding begins
+**Phase docs**: `.context/phases/phase-{N}.md` — All 13 phases documented
 
-### Planning Strategy
-1. **Create** detailed phase files for phases 0-12 (per APERTURE.md roadmap)
+### Planning Strategy (COMPLETE)
+1. ~~**Create** detailed phase files for phases 0-12~~ ✅ Done
 2. **Review** each phase for completeness, dependencies, acceptance criteria
 3. **Refine** based on review — resolve ambiguities, add missing details
 4. **Then code** — sprint with no blockers
@@ -205,7 +213,39 @@ make test-ui     # Frontend tests
 - `make check` — Quality checks before phase completion
 
 **Next session:**
-1. Create phase files for all 13 phases (0-12)
+1. ~~Create phase files for all 13 phases (0-12)~~ ✅ Done
 2. Review and refine each phase doc
 3. Resolve any ambiguities or missing acceptance criteria
 4. Then begin Phase 0 coding sprint
+
+---
+
+### 2026-02-04: Phase Documentation Complete
+
+**Completed:**
+- ✅ Created detailed phase docs for all 13 phases (phase-0.md through phase-12.md)
+- ✅ Each phase includes: context from previous phase, deliverables, implementation steps, test coverage, success criteria
+- ✅ Total estimated scope: ~650k context across all phases
+- ✅ Updated RESUME.md with full phase table
+
+**Phase overview:**
+| Phase | Estimated Context | Unit Tests | Integration Tests |
+|-------|------------------|------------|-------------------|
+| 0 | ~60-80k | TBD | TBD |
+| 1 | ~50k | 25+ | 8+ |
+| 2 | ~55k | 40+ | 10+ |
+| 3 | ~55k | 35+ | 8+ |
+| 4 | ~50k | 30+ | 6+ |
+| 5 | ~50k | 30+ | 6+ |
+| 6 | ~55k | 30+ | 8+ |
+| 7 | ~55k | 35+ | 8+ |
+| 8 | ~50k | 30+ | 6+ |
+| 9 | ~55k | 35+ | 6+ |
+| 10 | ~50k | 30+ | 6+ |
+| 11 | ~55k | 35+ | 8+ |
+| 12 | ~50k | 30+ | 6+ |
+
+**Next steps:**
+1. Review phase docs for completeness and accuracy
+2. Identify any gaps or ambiguities
+3. Begin Phase 0 coding sprint
