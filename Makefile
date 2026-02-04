@@ -5,13 +5,13 @@
 # ============================================================================
 
 dev:
-	pnpm tauri dev
+	npm run tauri dev
 
 build:
-	pnpm tauri build
+	npm run tauri build
 
 install:
-	pnpm install
+	npm install
 	cd src-tauri && cargo build
 
 # ============================================================================
@@ -20,19 +20,19 @@ install:
 
 lint:
 	cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
-	pnpm lint
+	npm run lint
 
 lint-fix:
 	cargo clippy --manifest-path src-tauri/Cargo.toml --fix --allow-dirty
-	pnpm lint --fix
+	npm run lint -- --fix
 
 format:
 	cargo fmt --manifest-path src-tauri/Cargo.toml
-	pnpm format
+	npm run format
 
 typecheck:
 	cargo check --manifest-path src-tauri/Cargo.toml
-	pnpm check
+	npm run check
 
 # THE IMPORTANT ONE: Run before completing any phase
 check: lint typecheck test
@@ -49,7 +49,7 @@ test-rust:
 	cargo test --manifest-path src-tauri/Cargo.toml
 
 test-ui:
-	pnpm test
+	npm run test
 
 # ============================================================================
 # Cleanup

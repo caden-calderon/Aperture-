@@ -1,9 +1,9 @@
 # Phase 0: UI Foundation
 
-**Status**: PLANNING (doc review before coding)
+**Status**: READY FOR SPRINT
 **Goal**: Complete Tauri + Svelte 5 app shell with full visual UI using mock data
 **Prerequisites**: None
-**Estimated Scope**: ~60-80k context
+**Estimated Scope**: ~40-50k context (UI-only, no backend logic)
 
 ---
 

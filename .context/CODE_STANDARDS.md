@@ -87,6 +87,35 @@ All code must pass `cargo clippy` with no warnings. Key lints enforced:
 - `clippy::unwrap_used` — Use `?` or `expect()` with context
 - `clippy::pedantic` — Enabled for thorough checks
 
+### Module Organization
+
+```
+src-tauri/src/
+├── lib.rs              # Library root, re-exports public API
+├── main.rs             # Binary entry
+├── commands.rs         # Tauri IPC commands (grows with features)
+├── proxy/              # Proxy layer (Phase 1)
+│   ├── mod.rs         # Module root
+│   ├── error.rs       # ProxyError types
+│   ├── parser.rs      # Message parsing
+│   └── capture.rs     # Request/response capture
+├── engine/             # Context engine (Phase 2+)
+│   ├── mod.rs         # Engine root, re-exports Block, Zone, etc.
+│   ├── block.rs       # Universal Block struct (THE canonical definition)
+│   ├── store.rs       # Block storage
+│   └── ...
+├── events/             # Event system (Phase 1)
+│   ├── mod.rs
+│   └── ...
+└── sidecar/            # Cleaner model (Phase 7)
+    ├── mod.rs
+    └── ...
+```
+
+**Convention for nested modules:**
+- Simple features: single file (`engine/tokens.rs`)
+- Complex features: directory with `mod.rs` (`engine/compression/mod.rs`, `engine/compression/rules.rs`)
+
 ---
 
 ## Svelte 5 Standards
@@ -212,6 +241,32 @@ mod tests {
 ```rust
 fn test_compression_with_empty_input_returns_empty() { ... }
 fn test_zone_assignment_system_prompt_goes_to_primacy() { ... }
+```
+
+### Test File Organization
+
+**Unit Tests (inline):** Use `#[cfg(test)]` blocks within each `.rs` file.
+```rust
+// In src-tauri/src/engine/block.rs
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_block_creation_sets_defaults() { ... }
+}
+```
+
+**Integration Tests:** Separate files in `tests/integration/`.
+```
+tests/
+├── integration/
+│   ├── test_proxy_flow.rs     # End-to-end proxy tests
+│   ├── test_engine_flow.rs    # Engine integration tests
+│   └── ...
+└── manual/
+    ├── README.md              # How to run manual tests
+    └── run_phase1_tests.py    # Manual test scripts
 ```
 
 ---

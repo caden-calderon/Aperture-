@@ -3,7 +3,7 @@
 **Status**: PENDING
 **Goal**: HTTP proxy that intercepts API calls, streams responses, and updates UI in real-time
 **Prerequisites**: Phase 0 complete
-**Estimated Scope**: ~50k context
+**Estimated Scope**: ~60-70k context (proxy + parsing + events + UI integration)
 
 ---
 
@@ -57,9 +57,11 @@ Extend `src-tauri/src/proxy/` to:
 Create `src-tauri/src/proxy/parser.rs`:
 - Parse Anthropic message format into blocks
 - Parse OpenAI message format into blocks
-- Normalize both into universal Block format
+- Normalize both into universal Block format (re-export from `engine::block`)
 - Handle tool_use and tool_result blocks
 - Extract token counts from responses
+
+**Note:** The canonical `Block` struct is defined in Phase 2's `engine::block.rs`. Phase 1's parser module re-exports it for convenience: `use crate::engine::Block` internally, `pub use crate::engine::Block` for external consumers.
 
 ### 3. WebSocket Event System
 
@@ -83,6 +85,16 @@ Detect provider from request characteristics:
 - `Authorization: Bearer` → OpenAI
 - Path patterns (`/v1/messages` vs `/v1/chat/completions`)
 - Store detected provider per session
+
+### 6. Hot Patch Mode
+
+Allow edits to take effect on the next request:
+- Store pending block modifications in proxy state
+- On next outbound request, apply pending edits before forwarding
+- Clear pending edits after application
+- Track edit source (manual, auto-rule) for versioning
+
+**Note:** Hot patch edits don't block the current request — they queue for the next one. This enables "fix while working" without pausing.
 
 ---
 

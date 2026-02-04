@@ -33,6 +33,9 @@ use crate::events::{EventDispatcher, ContextEvent};
 3. **No staleness tracking** — Can't identify old/unused blocks
 4. **No sorting pipeline** — No automatic classification based on content/age
 5. **No session management** — Can't track multiple concurrent sessions
+6. **No edit tracking** — Users can modify blocks but no undo/history
+7. **No dependency awareness** — Don't know which blocks reference others
+8. **No budget alerts** — No warnings when approaching token limit
 
 ---
 
@@ -104,6 +107,27 @@ Track multiple concurrent sessions:
 - Session metadata (provider, start time, token budget)
 - Session switching in UI
 
+### 7. Basic Block Versioning
+
+Track edits to blocks (foundation for Phase 11's advanced versioning):
+- Store edit history per block (last 5 versions)
+- Simple undo for manual edits
+- Track who/what made the change (user, auto-rule, hot-patch)
+
+### 8. Basic Dependency Tracking
+
+Deterministic dependency tracking (Phase 7 adds semantic deps):
+- File reference chains (block reads file → later blocks reference that file)
+- Conversation flow (user → assistant → tool chains)
+- Simple orphan detection (block's referenced file was removed)
+
+### 9. Basic Budget Alerts
+
+Simple threshold warnings (Phase 9 adds advanced analytics):
+- Alert at 80%, 90%, 95% budget utilization
+- Visual indicator on token budget bar
+- Optional toast notification
+
 ---
 
 ## Key Files to Create/Modify
@@ -118,6 +142,9 @@ Track multiple concurrent sessions:
 | `src-tauri/src/engine/staleness.rs` | **NEW** | Staleness scoring |
 | `src-tauri/src/engine/pipeline.rs` | **NEW** | Sorting/classification |
 | `src-tauri/src/engine/session.rs` | **NEW** | Session management |
+| `src-tauri/src/engine/versioning.rs` | **NEW** | Basic edit history |
+| `src-tauri/src/engine/dependency.rs` | **NEW** | Deterministic dep tracking |
+| `src-tauri/src/engine/budget.rs` | **NEW** | Budget threshold alerts |
 | `src-tauri/src/commands.rs` | Modify | Add engine IPC commands |
 | `src/lib/stores/context.ts` | Modify | Use real engine data |
 
@@ -165,11 +192,19 @@ Track multiple concurrent sessions:
 4. Integrate with proxy (create session on first request)
 5. UI integration for session picker
 
+### Step 6: Versioning, Dependencies & Budget (~10k context)
+
+1. Implement basic block versioning (last 5 edits)
+2. Implement deterministic dependency tracking (file refs, conversation flow)
+3. Add simple orphan detection
+4. Implement budget threshold alerts (80%, 90%, 95%)
+5. Unit tests for versioning, deps, and budget
+
 ---
 
 ## Test Coverage
 
-### Unit Tests (~40 tests)
+### Unit Tests (~50 tests)
 
 | File | Tests | Focus |
 |------|-------|-------|
@@ -179,6 +214,9 @@ Track multiple concurrent sessions:
 | `src-tauri/src/engine/tokens.rs` | 6 | Token counting accuracy |
 | `src-tauri/src/engine/staleness.rs` | 4 | Staleness calculation |
 | `src-tauri/src/engine/pipeline.rs` | 4 | Pipeline classification |
+| `src-tauri/src/engine/versioning.rs` | 4 | Edit history, undo |
+| `src-tauri/src/engine/dependency.rs` | 4 | File refs, orphan detection |
+| `src-tauri/src/engine/budget.rs` | 2 | Threshold alerts |
 
 ### Integration Tests (~10 tests)
 
@@ -210,8 +248,11 @@ Track multiple concurrent sessions:
 - [ ] Classification pipeline runs in <100μs
 - [ ] Multiple sessions tracked concurrently
 - [ ] Session switching works in UI
+- [ ] Basic block versioning with undo works
+- [ ] Deterministic dependency tracking detects file references
+- [ ] Budget alerts trigger at 80%, 90%, 95%
 - [ ] `make check` passes
-- [ ] 40+ unit tests passing
+- [ ] 50+ unit tests passing
 - [ ] 10+ integration tests passing
 - [ ] All manual tests documented and passing
 
@@ -224,4 +265,17 @@ use crate::engine::{Engine, Block, BlockStore, Zone, Session};
 use crate::engine::tokens::count_tokens;
 use crate::engine::pipeline::classify_blocks;
 use crate::engine::staleness::calculate_staleness;
+use crate::engine::versioning::{BlockVersion, VersionHistory};
+use crate::engine::dependency::{DependencyGraph, DependencyEdge};
+use crate::engine::budget::{BudgetAlert, check_budget_thresholds};
 ```
+
+---
+
+## Notes
+
+**Block type definition:** The universal `Block` struct is defined in `engine::block.rs` and re-exported by `proxy::parser` for convenience. There is one canonical Block type shared across the codebase.
+
+**Versioning scope:** Phase 2 implements basic edit history (last 5 versions, simple undo). Phase 11 enhances this with adaptive learning analysis and correction pattern tracking.
+
+**Dependency scope:** Phase 2 implements deterministic tracking (file refs, conversation chains). Phase 7 adds semantic dependencies detected by the cleaner model.
