@@ -2,52 +2,139 @@
 
 /* ============================================================================
    Aperture Design System
-   Halftone / Dithering / 1-Bit Aesthetic — Obra Dinn meets IDE
+   Apple Clean + Ditherpunk — High contrast, warm palette, dithering as accent
+   Light mode default, dark mode toggle
    ============================================================================ */
 
+/* --------------------------------------------------------------------------
+   Light Mode (Default) — Warm newspaper, high contrast, easy on eyes
+   Palette: #24201D, #4F3E34, #C6AC8F, #DED1B6, #F5F5DC
+   -------------------------------------------------------------------------- */
 :root {
-  /* Background layers */
-  --bg-deep: #0a0a0c;
-  --bg-surface: #111116;
-  --bg-elevated: #1a1a22;
-  --bg-hover: #22222e;
+  /* Backgrounds — Warm beige/tan palette */
+  --bg-base: #DED1B6;          /* Dun - main background */
+  --bg-surface: #F5F5DC;        /* Beige - cards/panels */
+  --bg-elevated: #ebe4d0;       /* Slightly darker than surface */
+  --bg-hover: #d4c7a8;          /* Hover state */
+  --bg-muted: #C6AC8F;          /* Khaki - muted areas */
+  --bg-inset: #d0c4a8;          /* Inset/recessed areas */
 
   /* Borders */
-  --border-dim: #2a2a38;
-  --border-active: #4a4a6a;
+  --border-subtle: #c4b89c;     /* Subtle dividers */
+  --border-default: #a89878;    /* Default borders */
+  --border-strong: #7a6a50;     /* Strong borders */
+
+  /* Text — High contrast against beige */
+  --text-primary: #24201D;      /* Eerie black */
+  --text-secondary: #3a3530;    /* Dark brown */
+  --text-muted: #4F3E34;        /* Taupe */
+  --text-faint: #6a5a4a;        /* Lighter brown */
+
+  /* Accent — Single primary accent for focus/selection */
+  --accent: #24201D;            /* Eerie black */
+  --accent-subtle: rgba(36, 32, 29, 0.08);
+  --accent-muted: rgba(36, 32, 29, 0.15);
+
+  /* Zone colors — Earthy, functional, darker for contrast */
+  --zone-primacy: #2d5245;      /* Dark forest */
+  --zone-middle: #6d5030;       /* Dark ochre */
+  --zone-recency: #5a3a48;      /* Dark plum */
+
+  /* Role colors — Darker for readability */
+  --role-system: #4a3860;       /* Dark purple */
+  --role-user: #2d4860;         /* Dark blue */
+  --role-assistant: #385840;    /* Dark green */
+  --role-tool: #584838;         /* Dark tan */
+
+  /* Semantic */
+  --semantic-success: #2d5838;
+  --semantic-warning: #705020;
+  --semantic-danger: #702828;
+  --semantic-info: #2d4868;
+
+  /* Dither pattern color */
+  --dither-color: #24201D;
+  --dither-opacity: 0.04;
+
+  /* Shadows — Warm tinted */
+  --shadow-sm: 0 1px 2px rgba(36, 32, 29, 0.08);
+  --shadow-md: 0 4px 12px rgba(36, 32, 29, 0.12);
+  --shadow-lg: 0 12px 32px rgba(36, 32, 29, 0.18);
+
+  /* UI Density scale factor */
+  --density-scale: 1;
+
+  /* Spacing scale */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --space-2xl: 48px;
+
+  /* Border radius */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+
+  /* Typography */
+  --font-mono: "JetBrains Mono", "IBM Plex Mono", ui-monospace, monospace;
+  --font-display: "IBM Plex Mono", ui-monospace, monospace;
+}
+
+/* --------------------------------------------------------------------------
+   Dark Mode — Warm charcoal palette (based on #24201D)
+   -------------------------------------------------------------------------- */
+[data-theme="dark"] {
+  /* Backgrounds */
+  --bg-base: #1a1816;           /* Warm charcoal */
+  --bg-surface: #24201D;        /* Eerie black - cards */
+  --bg-elevated: #2e2a26;       /* Elevated */
+  --bg-hover: #3a3530;          /* Hover */
+  --bg-muted: #4F3E34;          /* Taupe */
+  --bg-inset: #161412;          /* Inset/recessed */
+
+  /* Borders */
+  --border-subtle: #3a3530;
+  --border-default: #4a4540;
+  --border-strong: #5a5548;
 
   /* Text */
-  --text-primary: #e8e8f0;
-  --text-secondary: #8888a0;
-  --text-dim: #555568;
+  --text-primary: #F5F5DC;      /* Beige */
+  --text-secondary: #DED1B6;    /* Dun */
+  --text-muted: #C6AC8F;        /* Khaki */
+  --text-faint: #8a7a68;
 
-  /* Zone accents */
-  --accent-primacy: #4ecdc4;
-  --accent-middle: #ffd93d;
-  --accent-recency: #ff6b9d;
+  /* Accent */
+  --accent: #F5F5DC;
+  --accent-subtle: rgba(245, 245, 220, 0.08);
+  --accent-muted: rgba(245, 245, 220, 0.15);
 
-  /* Block type colors */
-  --accent-system: #6c5ce7;
-  --accent-user: #74b9ff;
-  --accent-assistant: #55efc4;
-  --accent-tool: #a29bfe;
+  /* Zone colors — Brighter for dark mode */
+  --zone-primacy: #5cb898;
+  --zone-middle: #d0b080;
+  --zone-recency: #b890a0;
 
-  /* Semantic colors */
-  --accent-danger: #ff4757;
-  --accent-condense: #f093fb;
-  --accent-success: #00d26a;
-  --accent-warning: #ffc048;
+  /* Role colors */
+  --role-system: #a898c0;
+  --role-user: #88a8c0;
+  --role-assistant: #90c098;
+  --role-tool: #c0a888;
 
-  /* Token budget */
-  --token-used: #4ecdc4;
-  --token-free: #2a2a38;
+  /* Semantic */
+  --semantic-success: #78b880;
+  --semantic-warning: #d0a858;
+  --semantic-danger: #d06868;
+  --semantic-info: #78a8d0;
 
-  /* Effects */
-  --shadow-glow: rgba(78, 205, 196, 0.08);
+  /* Dither */
+  --dither-color: #F5F5DC;
+  --dither-opacity: 0.025;
 
-  /* Halftone dot settings (for CSS patterns) */
-  --dot-size: 1px;
-  --dot-spacing: 4px;
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.5);
 }
 
 /* ============================================================================
@@ -67,11 +154,14 @@ body {
 }
 
 body {
-  font-family: "Outfit", "Inter", system-ui, sans-serif;
-  background: var(--bg-deep);
+  font-family: var(--font-mono);
+  font-size: calc(13px * var(--density-scale, 1));
+  line-height: 1.5;
+  background: var(--bg-base);
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 /* ============================================================================
@@ -79,20 +169,22 @@ body {
    ============================================================================ */
 
 .font-mono {
-  font-family: "JetBrains Mono", "IBM Plex Mono", "Fira Code", monospace;
+  font-family: var(--font-mono);
 }
 
 .font-display {
-  font-family: "Space Grotesk", "Outfit", system-ui, sans-serif;
+  font-family: var(--font-display);
+  font-weight: 500;
+  letter-spacing: -0.01em;
 }
 
 /* ============================================================================
-   Scrollbar Styling
+   Scrollbar — Minimal, unobtrusive
    ============================================================================ */
 
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
@@ -100,115 +192,50 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--border-dim);
-  border-radius: 3px;
+  background: var(--border-default);
+  border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--border-active);
+  background: var(--border-strong);
 }
 
 /* ============================================================================
-   Halftone / Dithering Patterns
+   Dither Pattern — CSS-based, subtle accent
    ============================================================================ */
 
-.halftone-sparse {
-  background-image: radial-gradient(
-    circle,
-    currentColor var(--dot-size),
-    transparent var(--dot-size)
-  );
-  background-size: calc(var(--dot-spacing) * 2) calc(var(--dot-spacing) * 2);
+.dither-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: var(--dither-opacity);
+  background-image: url("data:image/svg+xml,%3Csvg width='4' height='4' viewBox='0 0 4 4' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='1' cy='1' r='0.5' fill='%231a1816'/%3E%3Ccircle cx='3' cy='3' r='0.5' fill='%231a1816'/%3E%3C/svg%3E");
+  background-size: 4px 4px;
 }
 
-.halftone-medium {
-  background-image: radial-gradient(
-    circle,
-    currentColor var(--dot-size),
-    transparent var(--dot-size)
-  );
-  background-size: var(--dot-spacing) var(--dot-spacing);
+[data-theme="dark"] .dither-overlay {
+  background-image: url("data:image/svg+xml,%3Csvg width='4' height='4' viewBox='0 0 4 4' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='1' cy='1' r='0.5' fill='%23f4f0ea'/%3E%3Ccircle cx='3' cy='3' r='0.5' fill='%23f4f0ea'/%3E%3C/svg%3E");
 }
 
-.halftone-dense {
-  background-image: radial-gradient(
-    circle,
-    currentColor calc(var(--dot-size) * 1.5),
-    transparent calc(var(--dot-size) * 1.5)
-  );
-  background-size: calc(var(--dot-spacing) * 0.6) calc(var(--dot-spacing) * 0.6);
-}
-
-/* Dithered border effect */
-.border-dithered {
-  border-style: dashed;
-  border-image: repeating-linear-gradient(
-      90deg,
-      var(--border-dim) 0,
-      var(--border-dim) 2px,
+/* Bayer-style ordered dither for gradients */
+.dither-gradient {
+  background-image:
+    repeating-linear-gradient(
+      0deg,
+      transparent,
       transparent 2px,
-      transparent 4px
-    )
-    1;
+      var(--dither-color) 2px,
+      var(--dither-color) 4px
+    );
+  opacity: 0.03;
 }
 
 /* ============================================================================
-   Animation Utilities
-   ============================================================================ */
-
-@keyframes dissolve {
-  from {
-    opacity: 1;
-    filter: blur(0);
-  }
-  to {
-    opacity: 0;
-    filter: blur(4px);
-    transform: scale(0.95);
-  }
-}
-
-@keyframes materialize {
-  from {
-    opacity: 0;
-    filter: blur(4px);
-    transform: scale(1.02);
-  }
-  to {
-    opacity: 1;
-    filter: blur(0);
-    transform: scale(1);
-  }
-}
-
-@keyframes pulse-glow {
-  0%,
-  100% {
-    box-shadow: 0 0 0 0 var(--shadow-glow);
-  }
-  50% {
-    box-shadow: 0 0 20px 4px var(--shadow-glow);
-  }
-}
-
-.animate-dissolve {
-  animation: dissolve 0.25s ease forwards;
-}
-
-.animate-materialize {
-  animation: materialize 0.3s ease forwards;
-}
-
-.animate-pulse-glow {
-  animation: pulse-glow 2s ease-in-out infinite;
-}
-
-/* ============================================================================
-   Focus States
+   Focus States — Clean, visible
    ============================================================================ */
 
 :focus-visible {
-  outline: 2px solid var(--accent-primacy);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
@@ -217,6 +244,290 @@ body {
    ============================================================================ */
 
 ::selection {
-  background: rgba(78, 205, 196, 0.3);
+  background: var(--accent-muted);
   color: var(--text-primary);
+}
+
+/* ============================================================================
+   Animations — Physical, spring-like feel
+   ============================================================================ */
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-down {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Spring-like scale with overshoot */
+@keyframes pop-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  70% {
+    opacity: 1;
+    transform: scale(1.02);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes pulse-subtle {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.75; }
+}
+
+@keyframes pulse-danger {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+/* Materialize from scattered dots (conceptual) */
+@keyframes materialize {
+  0% {
+    opacity: 0;
+    filter: blur(4px);
+    transform: scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    filter: blur(0);
+    transform: scale(1);
+  }
+}
+
+/* Dissolve out */
+@keyframes dissolve {
+  0% {
+    opacity: 1;
+    filter: blur(0);
+  }
+  100% {
+    opacity: 0;
+    filter: blur(3px);
+  }
+}
+
+/* Checkpoint flash */
+@keyframes checkpoint-flash {
+  0% {
+    opacity: 0;
+    transform: scaleY(0);
+  }
+  20% {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.2s ease;
+}
+
+.animate-fade-out {
+  animation: fade-out 0.2s ease forwards;
+}
+
+.animate-slide-up {
+  animation: slide-up 0.2s ease;
+}
+
+.animate-slide-down {
+  animation: slide-down 0.2s ease;
+}
+
+.animate-pop-in {
+  animation: pop-in 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.animate-materialize {
+  animation: materialize 0.25s ease-out;
+}
+
+.animate-dissolve {
+  animation: dissolve 0.2s ease-in forwards;
+}
+
+.animate-pulse {
+  animation: pulse-subtle 2s ease-in-out infinite;
+}
+
+.animate-pulse-danger {
+  animation: pulse-danger 1s ease-in-out infinite;
+}
+
+/* ============================================================================
+   Utility Classes
+   ============================================================================ */
+
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
+/* ============================================================================
+   Grain/Noise Texture — Subtle film grain effect
+   ============================================================================ */
+
+.grain-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.03;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+}
+
+[data-theme="dark"] .grain-overlay {
+  opacity: 0.02;
+}
+
+/* ============================================================================
+   Interactive States
+   ============================================================================ */
+
+/* Subtle lift on hover */
+.lift-on-hover {
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.lift-on-hover:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+/* Press down effect */
+.press-on-active:active {
+  transform: translateY(0) scale(0.99);
+}
+
+/* Glow on focus */
+.glow-on-focus:focus-visible {
+  box-shadow: 0 0 0 3px var(--accent-subtle);
+}
+
+/* ============================================================================
+   Badge Styles
+   ============================================================================ */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: 500;
+  border-radius: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.badge-role {
+  background: var(--accent-subtle);
+  color: var(--text-secondary);
+}
+
+.badge-role[data-role="system"] {
+  background: color-mix(in srgb, var(--role-system) 15%, transparent);
+  color: var(--role-system);
+}
+
+.badge-role[data-role="user"] {
+  background: color-mix(in srgb, var(--role-user) 15%, transparent);
+  color: var(--role-user);
+}
+
+.badge-role[data-role="assistant"] {
+  background: color-mix(in srgb, var(--role-assistant) 15%, transparent);
+  color: var(--role-assistant);
+}
+
+.badge-role[data-role="tool_use"],
+.badge-role[data-role="tool_result"] {
+  background: color-mix(in srgb, var(--role-tool) 15%, transparent);
+  color: var(--role-tool);
+}
+
+/* ============================================================================
+   Zone Indicator Stripe
+   ============================================================================ */
+
+.zone-stripe {
+  width: 3px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.zone-stripe[data-zone="primacy"] {
+  background: var(--zone-primacy);
+}
+
+.zone-stripe[data-zone="middle"] {
+  background: var(--zone-middle);
+}
+
+.zone-stripe[data-zone="recency"] {
+  background: var(--zone-recency);
+}
+
+/* ============================================================================
+   Transitions
+   ============================================================================ */
+
+.transition-colors {
+  transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.transition-transform {
+  transition: transform 0.15s ease;
+}
+
+.transition-opacity {
+  transition: opacity 0.15s ease;
+}
+
+.transition-all {
+  transition: all 0.15s ease;
 }

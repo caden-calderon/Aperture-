@@ -30,43 +30,49 @@ If it's visible, it encodes information.
 
 ---
 
-## Color System (CSS Variables)
+## Color System (Theme Customizer)
 
-```css
-:root {
-  /* Base */
-  --bg-primary: #0a0a0a;
-  --bg-surface: #141414;
-  --bg-elevated: #1a1a1a;
-  --text-primary: #e0e0e0;
-  --text-secondary: #888888;
-  --text-muted: #555555;
+**User-customizable themes with 13 built-in presets.**
 
-  /* Zone Accents */
-  --primacy: #00d4aa;      /* Teal — primacy zone, selection, active */
-  --middle: #f0c040;       /* Yellow — middle zone, warnings */
-  --recency: #ff6b9d;      /* Pink — recency zone */
+### Built-in Presets
+**Dark:** Charcoal, Tokyo Night, Gruvbox, Catppuccin, Nord, Dracula, One Dark, Solarized
+**Light:** Warm, Gruvbox Light, Tokyo Light, Sepia, Solarized Light
 
-  /* Heat Scale (dot density + color) */
-  --heat-hot: #00d4aa;     /* Dense bright dots */
-  --heat-warm: #88ccaa;
-  --heat-cool: #666666;
-  --heat-cold: #333333;    /* Sparse dim dots */
+### Theme Store API (`$lib/stores/theme.svelte`)
+```typescript
+import { themeStore } from '$lib/stores';
 
-  /* Budget Bar Pressure */
-  --pressure-calm: #00d4aa;
-  --pressure-attention: #f0c040;
-  --pressure-warning: #ff8c00;
-  --pressure-urgent: #ff4444;
-  --pressure-critical: #cc0000;
+// Switch preset
+themeStore.setPreset('tokyo-night');
 
-  /* Block Types */
-  --block-system: #9b59b6;    /* Purple */
-  --block-user: #3498db;      /* Blue */
-  --block-assistant: #2ecc71; /* Green */
-  --block-tool: #b8a9c9;      /* Lavender */
-}
+// Customize individual color
+themeStore.setColor('bgBase', '#1a1b26');
+
+// Get current colors
+const colors = themeStore.effectiveColors;
+
+// Save custom theme
+themeStore.saveCurrentAsPreset('My Theme');
+
+// Check mode
+if (themeStore.isDark) { ... }
 ```
+
+### CSS Variables (set by theme store)
+```css
+--bg-base, --bg-surface, --bg-elevated, --bg-hover, --bg-muted, --bg-inset
+--border-subtle, --border-default, --border-strong
+--text-primary, --text-secondary, --text-muted, --text-faint
+--accent, --accent-subtle, --accent-muted
+```
+
+### Components
+- `ThemeCustomizer` — Sidebar panel with presets and color pickers
+- `ThemeToggle` — Quick dark/light toggle button
+- `TitleBar` — Custom window title bar (Tauri `decorations: false`)
+- `DensityControl` — UI scale slider (75%-125%)
+
+All themes persist to localStorage.
 
 ---
 
@@ -88,15 +94,15 @@ If it's visible, it encodes information.
 
 ### Token Budget Bar
 Dithered gradient. Tension increases with fill:
-- 0-60%: Sparse dots, teal
-- 60-80%: Denser dots, shifts yellow
-- 80-90%: Dense, subtle pulse (~2s), orange
-- 90-95%: Very dense, faster pulse (~1s), red-orange
-- 95%+: Nearly solid, rapid pulse, red
+- 0-60%: Sparse dots, warm gold
+- 60-80%: Denser dots, shifts ochre
+- 80-90%: Dense, subtle pulse (~2s), rust
+- 90-95%: Very dense, faster pulse (~1s), burnt sienna
+- 95%+: Nearly solid, rapid pulse, deep rust
 
 ### Block Heat
-- **Hot blocks**: Dense bright teal dots
-- **Cold blocks**: Sparse dim gray dots (literally fading away)
+- **Hot blocks**: Dense bright cream dots
+- **Cold blocks**: Sparse dim charcoal dots (literally fading away)
 - Heat transitions smoothly (~500ms) on data updates
 
 ### Compression Indicator
@@ -142,7 +148,7 @@ Subtle halftone patterns, noise grain on surfaces.
 - Blocks densify or thin as relevance changes
 
 ### Selection
-- **Click**: Instant teal border (no fade, decisive)
+- **Click**: Instant cream border (no fade, decisive)
 - **Hover**: Subtle 1px lift, shadow increase, dots intensify
 
 ### Toast Notifications
@@ -150,7 +156,7 @@ Subtle halftone patterns, noise grain on surfaces.
 - Auto-dismiss 3s with dissolution
 
 ### Checkpoint Save
-- Vertical teal flash line stamps through block list
+- Vertical cream flash line stamps through block list
 - Fades to persistent marker
 
 ---

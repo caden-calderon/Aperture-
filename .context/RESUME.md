@@ -10,10 +10,10 @@
 | Field | Value |
 |-------|-------|
 | **Phase** | 0 — UI Foundation |
-| **Status** | ✅ READY FOR SPRINT |
+| **Status** | 🔄 IN PROGRESS |
 | **Last Updated** | 2026-02-04 |
 | **Blocking Issues** | None |
-| **Next Step** | Begin Phase 0 implementation (Zone, ContextBlock, interactions) |
+| **Next Step** | Continue UI polish per user feedback |
 
 ---
 
@@ -35,7 +35,7 @@
 
 | Phase | Name | Status | Focus |
 |-------|------|--------|-------|
-| 0 | UI Foundation | PLANNING | Tauri + Svelte 5 shell, full visual UI with mock data, animations, dithering |
+| 0 | UI Foundation | 🔄 IN PROGRESS | Tauri + Svelte 5 shell, full visual UI with mock data, theme customizer |
 | 1 | Proxy Core | PENDING | HTTP intercept, request/response capture, WebSocket events |
 | 2 | Context Engine | PENDING | Block management, zones, token counting, classification |
 | 3 | Dynamic Compression | PENDING | Multi-level compression, slider UI, async LLM |
@@ -274,3 +274,181 @@ make test-ui     # Frontend tests
 - Multi-agent sharing (correctly deferred to Phase 12)
 
 **Sprint readiness: ✅ READY**
+
+---
+
+### 2026-02-04: Phase 0 Core UI Complete
+
+**Completed:**
+- ✅ Mock data system (`src/lib/mock-data.ts`) with realistic demo blocks
+- ✅ Svelte 5 stores using runes (`context.svelte.ts`, `selection.svelte.ts`, `ui.svelte.ts`)
+- ✅ `ContextBlock.svelte` — role colors, heat overlay, compression visual, drag support
+- ✅ `Zone.svelte` — collapsible headers, drop targets, zone accent colors
+- ✅ `TokenBudgetBar.svelte` — zone-segmented gradient, pressure animations, halftone overlay
+- ✅ `Modal.svelte` — block details with zone/compression/pin actions
+- ✅ `Toast.svelte` — notification system with materialize animation
+- ✅ Full interaction system (selection, drag-drop, keyboard shortcuts)
+- ✅ `make check` passes (lint + typecheck + Rust tests)
+- ✅ `npm run build` succeeds
+
+**Key files created:**
+- `src/lib/mock-data.ts` — Demo data generator
+- `src/lib/stores/*.svelte.ts` — State management
+- `src/lib/components/*.svelte` — UI components
+- `src/routes/+page.svelte` — Main app page (rewritten)
+
+**Next steps:**
+1. Test with `npm run tauri dev` (full desktop app)
+2. Add Canvas effects layer for true per-pixel halftone
+3. Refine animations (spring physics, dissolution particles)
+4. Performance profiling
+
+**Phase 0 status: ~85% complete**
+
+---
+
+### 2026-02-04: Color Scheme Overhaul
+
+**Completed:**
+- ✅ New warm beige/black/cream palette (newspaper/Obra Dinn aesthetic)
+- ✅ Updated `src/app.css` with full color system rewrite
+- ✅ Fixed banned fonts (removed Inter, Outfit, Space Grotesk)
+- ✅ Updated all components (ContextBlock, Zone, TokenBudgetBar, Modal, Toast)
+- ✅ Updated `+page.svelte` button/accent colors
+- ✅ Updated `aperture-ui.md` skill with new palette documentation
+- ✅ All checks pass (`make check`)
+
+**New palette theme:**
+- Backgrounds: Warm blacks (#0c0b09, #14120f, #1e1b17)
+- Text: Cream and warm grays (#f4efe4, #a89f8c, #6b6355)
+- Primary accent: Warm cream/gold (#e8dcc4)
+- Zone accents: Earthy golds/tans/browns (muted, functional)
+- Semantic colors: Burnt sienna (danger), ochre (warning), sage (success)
+
+**Fonts:** IBM Plex Mono (headers/labels), JetBrains Mono (code/data)
+
+**Phase 0 status: ✅ COMPLETE**
+
+---
+
+### 2026-02-04: Phase 0 Complete
+
+**Final deliverables:**
+- ✅ Canvas effects system (`src/lib/canvas/`) — halftone, dissolution, materialization
+- ✅ TokenBudgetBar canvas-based halftone rendering
+- ✅ CommandPalette component (Cmd+K) with full command list
+- ✅ All linting/typecheck/test errors resolved
+- ✅ Beige/black/cream newspaper aesthetic
+
+**Files created this session:**
+- `src/lib/canvas/halftone.ts` — Halftone rendering utilities
+- `src/lib/canvas/effects.ts` — Dissolution/materialization effects
+- `src/lib/canvas/index.ts` — Canvas module exports
+- `src/lib/components/CanvasOverlay.svelte` — Reusable canvas overlay
+- `src/lib/components/CommandPalette.svelte` — Cmd+K command palette
+
+**Component summary (7 total):**
+| Component | Purpose |
+|-----------|---------|
+| `TokenBudgetBar` | Token usage with canvas halftone |
+| `Zone` | Collapsible zone containers |
+| `ContextBlock` | Individual context blocks |
+| `Modal` | Block detail modal |
+| `Toast` | Notification toasts |
+| `CanvasOverlay` | Generic canvas effects layer |
+| `CommandPalette` | Cmd+K quick actions |
+
+**Ready for Phase 1: Proxy Core**
+
+---
+
+### 2026-02-04: Design System Overhaul v2
+
+**Completed:**
+- ✅ Light mode as DEFAULT (warm cream `#f8f5f0` background)
+- ✅ Dark mode toggle (warm near-black `#181614` background)
+- ✅ Theme store with localStorage persistence + system preference detection
+- ✅ ThemeToggle component (sun/moon icons in header)
+- ✅ Complete CSS variable system rewrite (`app.css`)
+- ✅ All 8 components updated to new design system
+- ✅ Apple-clean aesthetic meets ditherpunk
+
+**New Design Philosophy:**
+- Light mode first (newspaper/print aesthetic)
+- High contrast, lots of whitespace
+- Dithering as subtle accent, not overwhelming
+- Clean typography (JetBrains Mono + IBM Plex Mono)
+
+**Color Palette (Light Mode):**
+- Background: Warm cream (`#f8f5f0`)
+- Surface: Pure white (`#ffffff`)
+- Text: Near black (`#1a1816`)
+- Accent: Black (inverts in dark mode)
+
+**Files Updated:**
+- `src/app.css` — Complete rewrite with light/dark theme support
+- `src/lib/stores/theme.svelte.ts` — NEW: Theme store
+- `src/lib/components/ThemeToggle.svelte` — NEW: Toggle button
+- All components updated to use CSS variables
+
+**Status:** UI working, design refinements applied.
+
+---
+
+### 2026-02-04: Phase 0 Visual Polish
+
+**Completed:**
+- ✅ Light mode palette: Warmer tones, no pure whites (parchment `#f5f1e8`, cream `#faf8f3`)
+- ✅ Dark mode palette: Refined warm charcoal (`#16140f` base)
+- ✅ Added `--bg-inset` for recessed areas
+- ✅ Refined animations: spring-like pop-in, materialize, dissolve effects
+- ✅ Badge styles with `color-mix()` for role colors
+- ✅ Zone stripe and transition utilities
+- ✅ TokenBudgetBar: threshold markers, dither overlay on fill
+- ✅ ContextBlock: fade gradient on truncated content, cleaner badge styles
+- ✅ Zone: cleaner header, better spacing
+- ✅ Modal: backdrop blur, slide-in animation
+- ✅ ThemeToggle: smaller, cleaner
+- ✅ All checks pass (`make check`)
+
+**Design philosophy refined:**
+- Newspaper/print aesthetic — warm, not cold
+- No pure whites in light mode
+- Subtle texture through dithering, not overwhelming
+- Compact, dense UI — information-rich
+
+**Phase 0 status: POLISH COMPLETE**
+
+---
+
+### 2026-02-04: Theme Customization System
+
+**Completed:**
+- ✅ Custom Tauri title bar (`decorations: false`) - fully themeable
+- ✅ TitleBar component with logo, title, window controls (−, □, ×)
+- ✅ Complete theme customization system with presets and color pickers
+- ✅ 13 built-in presets:
+  - **Dark:** Charcoal, Tokyo Night, Gruvbox, Catppuccin, Nord, Dracula, One Dark, Solarized
+  - **Light:** Warm, Gruvbox Light, Tokyo Light, Sepia, Solarized Light
+- ✅ Theme Customizer component in sidebar with:
+  - Preset grid with visual swatches
+  - Color palette showing all current theme colors (click to copy or apply)
+  - 11 color pickers for full customization
+  - Save/delete custom themes
+  - Reset to preset defaults
+- ✅ Density control (75% - 125%) for UI scaling
+- ✅ All settings persist to localStorage
+
+**New Components:**
+- `TitleBar.svelte` - Custom window title bar
+- `ThemeCustomizer.svelte` - Full theme editor with presets and pickers
+- `DensityControl.svelte` - UI scale slider
+
+**Theme Store (`theme.svelte.ts`):**
+- `themeStore.setPreset(id)` - Switch to a preset
+- `themeStore.setColor(key, value)` - Customize individual colors
+- `themeStore.saveCurrentAsPreset(name)` - Save custom theme
+- `themeStore.deleteCustomPreset(id)` - Delete custom theme
+- `themeStore.effectiveColors` - Get current effective colors
+
+**Phase 0 status: ONGOING** (user has more requests)
