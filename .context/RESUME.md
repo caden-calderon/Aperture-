@@ -70,6 +70,7 @@
 
 ### Reference Materials
 - `reference/context-forge-prototype.html` — Working HTML prototype of UI
+- `.claude/skills/aperture-ui.md` — **USE FOR ALL UI WORK** (design system, colors, typography, animations)
 
 ---
 

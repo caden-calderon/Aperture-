@@ -13,6 +13,16 @@ This is the foundation phase. We build the entire UI experience with mock data b
 
 **Reference**: `reference/context-forge-prototype.html` — Working HTML prototype showing core interactions
 
+**⚠️ IMPORTANT: Use the `aperture-ui` skill for ALL UI work.**
+The skill at `.claude/skills/aperture-ui.md` defines:
+- Color system (CSS variables)
+- Typography (JetBrains Mono, IBM Plex Mono — NO generic fonts)
+- Halftone/dithering visual language
+- Animation timings and physics
+- Component patterns (Svelte 5 runes)
+
+If the skill doesn't auto-activate, reference it manually. Every component must follow the design system.
+
 ---
 
 ## Problem Statement
