@@ -1,6 +1,6 @@
 # Phase 0: UI Foundation
 
-**Status**: IN PROGRESS
+**Status**: PLANNING (doc review before coding)
 **Goal**: Complete Tauri + Svelte 5 app shell with full visual UI using mock data
 **Prerequisites**: None
 **Estimated Scope**: ~60-80k context
@@ -212,13 +212,20 @@ From `APERTURE.md` Aesthetic Direction:
 
 ---
 
-## Pre-Phase 0: Proxy Validation (NEXT)
+## Pre-Phase 0: Proxy Validation (COMPLETE)
 
-Before continuing UI work, validate the proxy architecture:
-- [ ] Write minimal axum proxy in `src-tauri/src/proxy/`
-- [ ] Test with `ANTHROPIC_BASE_URL=http://localhost:5400`
-- [ ] Confirm SSE streaming works (request flows through, response streams back)
-- [ ] Log intercepted requests to verify capture works
+Proxy spike implemented and compiling:
+- [x] Write minimal axum proxy in `src-tauri/src/proxy/`
+- [x] SSE streaming passthrough implemented
+- [x] Request/response logging with header redaction
+- [x] Upstream routing (Anthropic vs OpenAI detection)
+- [x] Unit tests passing (3/3)
+- [ ] Live test with `ANTHROPIC_BASE_URL=http://localhost:5400` (needs `pnpm tauri dev`)
+
+**Files created:**
+- `src-tauri/src/proxy/mod.rs` — Main proxy implementation
+- `src-tauri/src/proxy/error.rs` — Error types
+- `tests/test_proxy.sh` — Manual test script
 
 ---
 

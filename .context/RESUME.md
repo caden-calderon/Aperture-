@@ -10,10 +10,10 @@
 | Field | Value |
 |-------|-------|
 | **Phase** | 0 — UI Foundation |
-| **Status** | IN PROGRESS (repo setup complete) |
+| **Status** | PLANNING (setup complete, creating phase docs) |
 | **Last Updated** | 2026-02-04 |
 | **Blocking Issues** | None |
-| **Next Step** | Validate proxy concept with minimal spike |
+| **Next Step** | Create detailed phase files for all phases (0-12) |
 
 ---
 
@@ -35,13 +35,19 @@
 
 | Phase | Name | Status | Focus |
 |-------|------|--------|-------|
-| 0 | UI Foundation | NOT STARTED | Tauri + Svelte 5 shell, full visual UI with mock data, animations, dithering effects |
+| 0 | UI Foundation | PLANNING | Tauri + Svelte 5 shell, full visual UI with mock data, animations, dithering effects |
 | 1 | Proxy Core | PENDING | HTTP intercept, request/response capture, SSE streaming, live UI updates |
 | 2 | Context Engine | PENDING | Parsing, zones, token counting, block management |
 | 3 | Dynamic Compression | PENDING | Multi-level compression, slider UI, LLM integration |
-| 4+ | See APERTURE.md | PENDING | Heat maps, clustering, checkpoints, etc. |
+| 4-12 | See APERTURE.md | PENDING | Heat maps, clustering, checkpoints, staging, analytics, plugins |
 
-**Read phase details**: `.context/phases/phase-{N}.md`
+**Phase docs**: `.context/phases/phase-{N}.md` — Create all before coding begins
+
+### Planning Strategy
+1. **Create** detailed phase files for phases 0-12 (per APERTURE.md roadmap)
+2. **Review** each phase for completeness, dependencies, acceptance criteria
+3. **Refine** based on review — resolve ambiguities, add missing details
+4. **Then code** — sprint with no blockers
 
 ---
 
@@ -154,5 +160,52 @@ make test-ui     # Frontend tests
 - `reference/context-forge-prototype.html` — HTML prototype archived
 
 **Next session:**
-1. **Proxy validation spike** — Write minimal Rust proxy, test with `ANTHROPIC_BASE_URL`, confirm SSE streaming works
-2. Then continue Phase 0 UI components
+1. Live test proxy with real API call
+2. Continue Phase 0 UI components (Zone, ContextBlock)
+
+---
+
+### 2026-02-04: Proxy Spike Complete
+
+**Completed:**
+- ✅ Proxy module created (`src-tauri/src/proxy/`)
+- ✅ SSE streaming passthrough for real-time responses
+- ✅ Upstream routing (detects Anthropic vs OpenAI by headers/path)
+- ✅ Request/response logging with sensitive header redaction
+- ✅ Unit tests passing (3/3)
+- ✅ Clippy clean
+
+**Key files:**
+- `src-tauri/src/proxy/mod.rs` — Main proxy with axum router
+- `src-tauri/src/proxy/error.rs` — ProxyError types
+- `src-tauri/src/lib.rs` — Updated to spawn proxy on startup
+- `tests/test_proxy.sh` — Manual test script
+
+**Architecture validated:**
+- Proxy starts on port 5400 in background thread
+- Forwards requests to upstream (Anthropic/OpenAI) based on headers
+- Streams SSE responses back to client
+- Logs all requests/responses for debugging
+
+---
+
+### 2026-02-04: Dev Environment Setup Complete
+
+**Completed:**
+- ✅ MCPs installed: rust-tools, crates (+ existing svelte, pal, context7, openrouter)
+- ✅ Project skill created: `.claude/skills/aperture-ui.md` (combined frontend-design + Aperture aesthetic)
+- ✅ Project CLAUDE.md created
+- ✅ Fish function installed: `aperture claude` wrapper
+- ✅ .env setup with dotenvy for config loading
+- ✅ SSE streaming validated with real API call
+
+**Dev environment ready:**
+- `aperture claude` — Launch Claude Code through proxy
+- `aperture status` — Check proxy health
+- `make check` — Quality checks before phase completion
+
+**Next session:**
+1. Create phase files for all 13 phases (0-12)
+2. Review and refine each phase doc
+3. Resolve any ambiguities or missing acceptance criteria
+4. Then begin Phase 0 coding sprint
