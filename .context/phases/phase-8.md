@@ -53,9 +53,17 @@ Search across context:
 
 LLM-assisted search via cleaner model:
 - "Find everything related to database connection pooling"
-- Embeddings-based similarity (optional)
 - Works even without exact keywords
 - Powered by local model for privacy
+
+**Embeddings (opt-in, off by default):**
+- Generate embeddings for blocks via local model
+- Store in SQLite (BLOB column)
+- Enables faster similarity search for large historical datasets
+- User enables in settings: "Generate embeddings for semantic search"
+- Configurable: which model, when to generate (on block create, background batch, manual)
+
+**Philosophy:** Everything is customizable. Users who want fast semantic search can enable embeddings. Users who want minimal resource usage can rely on LLM-assisted search only.
 
 ### 3. Keyword-Based Selection
 

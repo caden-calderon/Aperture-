@@ -90,6 +90,22 @@ Horizontal visualization of session evolution:
 - Dependency edges overlaid
 - Checkpoint markers as vertical lines
 
+### 3b. Multi-Window / Split View (All Essential)
+
+All five split view modes are core Phase 9 features:
+
+1. **Session comparison** — Two active sessions side by side
+2. **Snapshot diff** — Two snapshots with diff highlighting
+3. **Fork comparison** — Two branches of a forked context
+4. **Timeline + Editor** — Timeline view on top, block editor below
+5. **Before/After compression** — Original vs compressed versions
+
+**Implementation:**
+- Flexible pane system (horizontal/vertical split)
+- Synchronized scrolling option
+- Selection sync (select in one pane, highlight in other)
+- Keyboard shortcuts for quick split/unsplit
+
 ### 4. Context Replay
 
 Step through session evolution:

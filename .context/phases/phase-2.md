@@ -107,6 +107,25 @@ Track multiple concurrent sessions:
 - Session metadata (provider, start time, token budget)
 - Session switching in UI
 
+### Storage Layer (SQLite)
+
+Persistent storage for sessions, blocks, and metadata:
+- **Location:** `~/.aperture/aperture.db`
+- **Schema:** Sessions, blocks, checkpoints, settings tables
+- **Why SQLite:**
+  - Single file, easy backup
+  - Full-text search (FTS5) for Phase 8
+  - Structured queries (filter by date, session, block type)
+  - Rust support via `rusqlite`
+  - Can store embeddings efficiently (BLOB)
+
+**Initial tables:**
+- `sessions` — id, provider, start_time, token_budget, metadata
+- `blocks` — id, session_id, role, content, tokens, zone, compression_level, timestamps
+- `block_versions` — block_id, version, content, edited_at, edit_source
+
+**Note:** In-memory store (`BlockStore`) is the hot path for current session. SQLite syncs in background for persistence and historical access.
+
 ### 7. Basic Block Versioning
 
 Track edits to blocks (foundation for Phase 11's advanced versioning):
@@ -145,8 +164,10 @@ Simple threshold warnings (Phase 9 adds advanced analytics):
 | `src-tauri/src/engine/versioning.rs` | **NEW** | Basic edit history |
 | `src-tauri/src/engine/dependency.rs` | **NEW** | Deterministic dep tracking |
 | `src-tauri/src/engine/budget.rs` | **NEW** | Budget threshold alerts |
+| `src-tauri/src/engine/storage.rs` | **NEW** | SQLite persistence layer |
 | `src-tauri/src/commands.rs` | Modify | Add engine IPC commands |
 | `src/lib/stores/context.ts` | Modify | Use real engine data |
+| `src-tauri/Cargo.toml` | Modify | Add `rusqlite` dependency |
 
 ---
 

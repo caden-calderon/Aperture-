@@ -80,6 +80,26 @@ Enables:
 - Dynamic rebalancing on topic pivots
 - Color-coded cluster badges in UI
 
+### Dynamic Rebalancing (Context Breathing)
+
+When the agent switches tasks (e.g., finishes "safety" work, starts "plugins"):
+
+**Detection (both automatic and manual):**
+- **Automatic:** Detect topic shift from user messages (keyword analysis, cluster change)
+- **Manual:** User clicks "switch to topic X" or uses command palette
+- Manual always overrides automatic detection
+
+**Rebalancing flow:**
+1. Pause outbound request (or trigger on task completion hook)
+2. Identify old topic's blocks → compress to summarized/minimal
+3. Identify new topic's blocks → expand to original/trimmed
+4. Resume with rebalanced context
+
+**Configuration:**
+- Rebalancing aggressiveness (how much to compress old topic)
+- Animation speed (instant vs. smooth transition)
+- Auto-rebalance toggle (can disable for manual-only control)
+
 ### 5. Semantic Deduplication
 
 Detect redundant content:

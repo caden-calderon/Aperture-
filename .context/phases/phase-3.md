@@ -130,6 +130,26 @@ Always keep certain content verbatim:
 
 Configured per project or globally.
 
+### 7. Compression Quality Metrics
+
+Quality scoring to flag potentially bad compressions (will evolve over time):
+
+**Initial heuristics:**
+- Token ratio check (warn if >15:1 compression)
+- Key phrase preservation (check if important terms survive)
+- Structural integrity (code blocks, lists preserved)
+
+**LLM-assisted (via cleaner model in Phase 7):**
+- Self-evaluation prompt: "Does this summary preserve the key information?"
+- Confidence scoring
+
+**User-configurable:**
+- Threshold sliders for each metric
+- Per-project quality profiles
+- "Flag for review" vs "auto-reject" behavior
+
+**Note:** This is a foundation. Quality metrics will be refined based on real-world usage and user feedback.
+
 ---
 
 ## Key Files to Create/Modify
