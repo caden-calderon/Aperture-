@@ -1,6 +1,6 @@
 # Phase 0: UI Foundation
 
-**Status**: NOT STARTED
+**Status**: IN PROGRESS
 **Goal**: Complete Tauri + Svelte 5 app shell with full visual UI using mock data
 **Prerequisites**: None
 **Estimated Scope**: ~60-80k context
@@ -175,29 +175,32 @@ From `APERTURE.md` Aesthetic Direction:
 
 ## Implementation Progress
 
-*Updated as work progresses*
+*Updated: 2026-02-04*
 
-### Step 1: Project Setup
-- [ ] Initialize Tauri + Svelte project
-- [ ] Configure Tailwind
-- [ ] Verify dev workflow
+### Step 1: Project Setup (COMPLETE)
+- [x] Initialize Tauri v2 + Svelte 5 project
+- [x] Configure Tailwind CSS (via @tailwindcss/vite)
+- [x] TypeScript configured
+- [x] Rust dependencies (axum, tokio, tiktoken-rs, etc.)
+- [x] Basic UI shell renders
+- [ ] Verify full `npm run tauri dev` workflow (first build is slow, needs test)
 
-### Step 2: Layout & Components
-- [ ] Main layout
-- [ ] TokenBudgetBar
-- [ ] Zone components
-- [ ] ContextBlock
-- [ ] Sidebar
+### Step 2: Layout & Components (PARTIAL)
+- [x] Main layout structure (header, sidebar, main area)
+- [x] TokenBudgetBar (basic, with animated fill)
+- [ ] Zone components (primacy, middle, recency) — placeholder only
+- [ ] ContextBlock component
+- [x] Sidebar (sections, filters, shortcuts)
 
 ### Step 3: Interactions
-- [ ] Selection
-- [ ] Drag-and-drop
+- [ ] Selection (click, shift+click, select all)
+- [ ] Drag-and-drop between zones
 - [ ] Keyboard shortcuts
-- [ ] Modal
+- [ ] Modal for block details
 - [ ] Toasts
 
 ### Step 4: Canvas Effects
-- [ ] Canvas overlay
+- [ ] Canvas overlay system
 - [ ] Halftone rendering
 - [ ] Dissolution/materialization
 - [ ] Compression visual
@@ -206,6 +209,16 @@ From `APERTURE.md` Aesthetic Direction:
 - [ ] Animation refinement
 - [ ] Theme consistency
 - [ ] Performance
+
+---
+
+## Pre-Phase 0: Proxy Validation (NEXT)
+
+Before continuing UI work, validate the proxy architecture:
+- [ ] Write minimal axum proxy in `src-tauri/src/proxy/`
+- [ ] Test with `ANTHROPIC_BASE_URL=http://localhost:5400`
+- [ ] Confirm SSE streaming works (request flows through, response streams back)
+- [ ] Log intercepted requests to verify capture works
 
 ---
 

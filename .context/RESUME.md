@@ -10,10 +10,10 @@
 | Field | Value |
 |-------|-------|
 | **Phase** | 0 — UI Foundation |
-| **Status** | NOT STARTED |
+| **Status** | IN PROGRESS (repo setup complete) |
 | **Last Updated** | 2026-02-04 |
 | **Blocking Issues** | None |
-| **Next Step** | Initialize Tauri + Svelte project, validate proxy concept |
+| **Next Step** | Validate proxy concept with minimal spike |
 
 ---
 
@@ -129,3 +129,30 @@ make test-ui     # Frontend tests
 3. Update RESUME.md
 4. Add "Context from Phase N" to next phase
 5. Commit: `phase-N: complete`
+
+---
+
+## Progress Log
+
+### 2026-02-04: Repo Setup Complete
+
+**Completed:**
+- ✅ Git repo initialized (`main` branch)
+- ✅ Tauri v2 + Svelte 5 + SvelteKit project skeleton
+- ✅ Rust dependencies configured (axum, tokio, tiktoken-rs, reqwest, tower-http, etc.)
+- ✅ Basic UI shell with header, token bar, sidebar, zones placeholder
+- ✅ Design system (CSS variables, halftone patterns, animations)
+- ✅ TypeScript types for Block, Session, Snapshot
+- ✅ Agent handoff structure (`.context/`, phases, RESUME.md)
+- ✅ Initial commit: `f951650`
+
+**Key files:**
+- `src/routes/+page.svelte` — UI shell with animated token bar
+- `src/app.css` — Design system with CSS variables
+- `src/lib/types.ts` — TypeScript interfaces
+- `src-tauri/Cargo.toml` — Rust dependencies
+- `reference/context-forge-prototype.html` — HTML prototype archived
+
+**Next session:**
+1. **Proxy validation spike** — Write minimal Rust proxy, test with `ANTHROPIC_BASE_URL`, confirm SSE streaming works
+2. Then continue Phase 0 UI components
