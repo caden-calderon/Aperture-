@@ -3,6 +3,7 @@
  * Manages blocks, zones, and token budget state
  *
  * Uses Svelte 5 runes for reactive state management
+ * Persists blocks and snapshots to localStorage
  */
 
 import type { Block, Zone, TokenBudget, Snapshot, Role } from "../types";
@@ -19,6 +20,53 @@ import {
 let blocks = $state<Block[]>([]);
 let snapshots = $state<Snapshot[]>([]);
 const tokenLimit = 200000;
+
+// ============================================================================
+// Persistence
+// ============================================================================
+
+const STORAGE_KEY = "aperture-context";
+
+function saveToLocalStorage(): void {
+  if (typeof localStorage === "undefined") return;
+  try {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ blocks, snapshots })
+    );
+  } catch (e) {
+    console.error("Failed to save context:", e);
+  }
+}
+
+function loadFromLocalStorage(): boolean {
+  if (typeof localStorage === "undefined") return false;
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (!stored) return false;
+
+    const data = JSON.parse(stored);
+    if (!Array.isArray(data.blocks) || data.blocks.length === 0) return false;
+
+    // Restore Date objects (JSON serializes them as strings)
+    blocks = data.blocks.map((b: Block) => ({
+      ...b,
+      timestamp: new Date(b.timestamp),
+    }));
+    snapshots = (data.snapshots ?? []).map((s: Snapshot) => ({
+      ...s,
+      timestamp: new Date(s.timestamp),
+      blocks: s.blocks.map((b: Block) => ({
+        ...b,
+        timestamp: new Date(b.timestamp),
+      })),
+    }));
+    return true;
+  } catch (e) {
+    console.error("Failed to load context:", e);
+    return false;
+  }
+}
 
 // ============================================================================
 // Derived State
@@ -61,9 +109,17 @@ const blockMap = $derived(new Map(blocks.map((b) => [b.id, b])));
 // Actions
 // ============================================================================
 
+function init(): void {
+  const loaded = loadFromLocalStorage();
+  if (!loaded) {
+    loadDemoData();
+  }
+}
+
 function loadDemoData(): void {
   blocks = generateDemoBlocks();
   snapshots = generateDemoSnapshots();
+  saveToLocalStorage();
 }
 
 function getBlock(id: string): Block | undefined {
@@ -79,22 +135,25 @@ function moveBlock(blockId: string, targetZone: Zone): void {
   if (index === -1) return;
 
   blocks[index] = { ...blocks[index], zone: targetZone };
-  // Trigger reactivity
   blocks = [...blocks];
+  saveToLocalStorage();
 }
 
 function moveBlocks(blockIds: string[], targetZone: Zone): void {
   const idSet = new Set(blockIds);
   blocks = blocks.map((b) => (idSet.has(b.id) ? { ...b, zone: targetZone } : b));
+  saveToLocalStorage();
 }
 
 function removeBlock(blockId: string): void {
   blocks = blocks.filter((b) => b.id !== blockId);
+  saveToLocalStorage();
 }
 
 function removeBlocks(blockIds: string[]): void {
   const idSet = new Set(blockIds);
   blocks = blocks.filter((b) => !idSet.has(b.id));
+  saveToLocalStorage();
 }
 
 function createBlock(
@@ -126,6 +185,7 @@ function createBlock(
     metadata: { provider: "manual", turnIndex: blocks.length, filePaths: [] },
   };
   blocks = [...blocks, newBlock];
+  saveToLocalStorage();
   return newBlock;
 }
 
@@ -144,6 +204,7 @@ function updateBlockContent(blockId: string, content: string): void {
     },
   };
   blocks = [...blocks];
+  saveToLocalStorage();
 }
 
 function setBlockRole(blockId: string, role: Role, blockType?: string): void {
@@ -151,11 +212,13 @@ function setBlockRole(blockId: string, role: Role, blockType?: string): void {
   if (index === -1) return;
   blocks[index] = { ...blocks[index], role, blockType };
   blocks = [...blocks];
+  saveToLocalStorage();
 }
 
 function setBlocksRole(blockIds: string[], role: Role): void {
   const idSet = new Set(blockIds);
   blocks = blocks.map((b) => (idSet.has(b.id) ? { ...b, role } : b));
+  saveToLocalStorage();
 }
 
 function reorderBlock(blockId: string, newIndex: number): void {
@@ -167,6 +230,7 @@ function reorderBlock(blockId: string, newIndex: number): void {
   newBlocks.splice(currentIndex, 1);
   newBlocks.splice(newIndex, 0, block);
   blocks = newBlocks;
+  saveToLocalStorage();
 }
 
 function reorderBlocksInZone(
@@ -174,35 +238,30 @@ function reorderBlocksInZone(
   blockIds: string[],
   insertIndex: number
 ): void {
-  // Get sorted zone blocks (with pins in correct positions)
   const zoneBlocks = sortBlocksWithPins(blocks.filter((b) => b.zone === zone));
   const otherBlocks = blocks.filter((b) => b.zone !== zone);
   const idSet = new Set(blockIds);
 
-  // Check if we're trying to move pinned blocks - don't allow
   const movingPinnedBlocks = zoneBlocks.filter(
     (b) => idSet.has(b.id) && b.pinned !== null
   );
   if (movingPinnedBlocks.length > 0) {
-    // Don't move pinned blocks via drag
     return;
   }
 
   const movingBlocks = zoneBlocks.filter((b) => idSet.has(b.id));
   const stayingBlocks = zoneBlocks.filter((b) => !idSet.has(b.id));
 
-  // Calculate valid insert range (between pinned-top and pinned-bottom)
   const pinnedTopCount = stayingBlocks.filter((b) => b.pinned === "top").length;
   const pinnedBottomCount = stayingBlocks.filter((b) => b.pinned === "bottom").length;
   const minIndex = pinnedTopCount;
   const maxIndex = stayingBlocks.length - pinnedBottomCount;
 
-  // Clamp insert index to valid range
   const clampedIndex = Math.max(minIndex, Math.min(insertIndex, maxIndex));
   stayingBlocks.splice(clampedIndex, 0, ...movingBlocks);
 
-  // Reconstruct blocks array maintaining zone order
   blocks = [...otherBlocks, ...stayingBlocks];
+  saveToLocalStorage();
 }
 
 function setCompressionLevel(
@@ -214,6 +273,7 @@ function setCompressionLevel(
 
   blocks[index] = { ...blocks[index], compressionLevel: level };
   blocks = [...blocks];
+  saveToLocalStorage();
 }
 
 function pinBlock(blockId: string, position: Block["pinned"]): void {
@@ -222,9 +282,9 @@ function pinBlock(blockId: string, position: Block["pinned"]): void {
 
   blocks[index] = { ...blocks[index], pinned: position };
   blocks = [...blocks];
+  saveToLocalStorage();
 }
 
-// Get valid drop index range for a zone (respecting pinned blocks)
 function getValidDropRange(zone: Zone): { min: number; max: number } {
   const zoneBlocks = sortBlocksWithPins(blocks.filter((b) => b.zone === zone));
   const pinnedTopCount = zoneBlocks.filter((b) => b.pinned === "top").length;
@@ -244,6 +304,7 @@ function updateBlockHeat(blockId: string, heat: number): void {
     usageHeat: Math.max(0, Math.min(1, heat)),
   };
   blocks = [...blocks];
+  saveToLocalStorage();
 }
 
 function saveSnapshot(name: string): Snapshot {
@@ -257,6 +318,7 @@ function saveSnapshot(name: string): Snapshot {
   };
 
   snapshots = [...snapshots, snapshot];
+  saveToLocalStorage();
   return snapshot;
 }
 
@@ -265,11 +327,13 @@ function restoreSnapshot(snapshotId: string): boolean {
   if (!snapshot) return false;
 
   blocks = JSON.parse(JSON.stringify(snapshot.blocks));
+  saveToLocalStorage();
   return true;
 }
 
 function deleteSnapshot(snapshotId: string): void {
   snapshots = snapshots.filter((s) => s.id !== snapshotId);
+  saveToLocalStorage();
 }
 
 // ============================================================================
@@ -277,7 +341,7 @@ function deleteSnapshot(snapshotId: string): void {
 // ============================================================================
 
 export const contextStore = {
-  // Reactive getters (must be accessed as functions due to $derived)
+  // Reactive getters
   get blocks() {
     return blocks;
   },
@@ -295,6 +359,7 @@ export const contextStore = {
   },
 
   // Actions
+  init,
   loadDemoData,
   getBlock,
   getBlockIndex,

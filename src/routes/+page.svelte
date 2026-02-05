@@ -31,8 +31,8 @@
     // Initialize zones store
     zonesStore.init();
 
-    // Load demo data
-    contextStore.loadDemoData();
+    // Load persisted blocks or demo data
+    contextStore.init();
   });
 
   // Sidebar resize handlers
