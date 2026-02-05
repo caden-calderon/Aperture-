@@ -26,6 +26,9 @@
     onDragEnd,
   }: Props = $props();
 
+  // Per-block collapsed state (local, not persisted)
+  let isCollapsed = $state(false);
+
   // Count how many blocks are being dragged
   const dragCount = $derived(selected && selectedIds.size > 1 ? selectedIds.size : 1);
 
@@ -34,6 +37,10 @@
   const typeInfo = $derived(blockTypesStore.getTypeById(displayTypeId));
   const displayColor = $derived(typeInfo?.color ?? "var(--text-muted)");
   const displayLabel = $derived(typeInfo?.shortLabel ?? displayTypeId.slice(0, 4).toUpperCase());
+
+  // Whether to show full content (zone-level expand OR block not collapsed)
+  const showContent = $derived(!isCollapsed);
+  const showFullContent = $derived(contentExpanded && !isCollapsed);
 
   function handleClick(e: MouseEvent) {
     onSelect?.(block.id, {
@@ -48,14 +55,12 @@
   }
 
   function handleDragStart(e: DragEvent) {
-    // If this block is selected and part of a multi-selection, drag all selected
     const idsToMove = selected && selectedIds.size > 1
       ? [...selectedIds]
       : [block.id];
 
     if (e.dataTransfer) {
       e.dataTransfer.effectAllowed = "move";
-      // Store as JSON array of IDs
       e.dataTransfer.setData("text/plain", JSON.stringify(idsToMove));
     }
     onDragStart?.(idsToMove);
@@ -63,6 +68,11 @@
 
   function handleDragEnd() {
     onDragEnd?.();
+  }
+
+  function toggleCollapse(e: MouseEvent) {
+    e.stopPropagation();
+    isCollapsed = !isCollapsed;
   }
 
   function getPreview(content: string, maxLength = 180): string {
@@ -80,6 +90,7 @@
   class="block"
   class:selected
   class:dragging
+  class:collapsed={isCollapsed}
   class:pinned={block.pinned !== null}
   style:--role-color={displayColor}
   data-block-id={block.id}
@@ -96,7 +107,7 @@
     }
   }}
 >
-  <div class="block-header">
+  <div class="block-header" class:no-margin={isCollapsed}>
     <span class="role-badge">{displayLabel}</span>
     {#if block.pinned}
       <span class="pin-badge" title="Pinned to {block.pinned}">
@@ -108,11 +119,20 @@
       <span class="tool-name">{block.metadata.toolName}</span>
     {/if}
     <span class="token-count">{formatTokens(block.tokens)}</span>
+    <button
+      class="collapse-toggle"
+      onclick={toggleCollapse}
+      title={isCollapsed ? "Expand block" : "Collapse block"}
+    >
+      {isCollapsed ? "▸" : "▾"}
+    </button>
   </div>
 
-  <div class="block-content" class:content-expanded={contentExpanded}>
-    <pre>{contentExpanded ? block.content : getPreview(block.content)}</pre>
-  </div>
+  {#if showContent}
+    <div class="block-content" class:content-expanded={showFullContent}>
+      <pre>{showFullContent ? block.content : getPreview(block.content)}</pre>
+    </div>
+  {/if}
 
   {#if block.compressionLevel !== "original"}
     <span class="compression-badge">{block.compressionLevel}</span>
@@ -192,6 +212,10 @@
     margin-bottom: 4px;
   }
 
+  .block-header.no-margin {
+    margin-bottom: 0;
+  }
+
   .role-badge {
     font-family: var(--font-mono);
     font-size: calc(9px * var(--density-scale, 1));
@@ -240,6 +264,24 @@
     font-size: 9px;
     color: var(--text-faint);
     font-variant-numeric: tabular-nums;
+  }
+
+  .collapse-toggle {
+    font-size: 9px;
+    color: var(--text-faint);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 1px 3px;
+    border-radius: 2px;
+    line-height: 1;
+    transition: all 0.1s ease;
+    flex-shrink: 0;
+  }
+
+  .collapse-toggle:hover {
+    color: var(--text-primary);
+    background: var(--bg-hover);
   }
 
   .block-content {

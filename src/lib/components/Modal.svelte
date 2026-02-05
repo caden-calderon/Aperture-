@@ -261,6 +261,8 @@
             bind:this={textareaRef}
             bind:value={editContent}
             spellcheck="true"
+            lang="en"
+            autocomplete="off"
             onkeydown={handleEditKeydown}
           ></textarea>
         {:else}
