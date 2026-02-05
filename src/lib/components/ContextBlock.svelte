@@ -267,13 +267,13 @@
   }
 
   .collapse-toggle {
-    font-size: 9px;
-    color: var(--text-faint);
+    font-size: 11px;
+    color: var(--text-muted);
     background: none;
-    border: none;
+    border: 1px solid var(--border-subtle);
     cursor: pointer;
-    padding: 1px 3px;
-    border-radius: 2px;
+    padding: 2px 5px;
+    border-radius: 3px;
     line-height: 1;
     transition: all 0.1s ease;
     flex-shrink: 0;
@@ -282,6 +282,7 @@
   .collapse-toggle:hover {
     color: var(--text-primary);
     background: var(--bg-hover);
+    border-color: var(--border-default);
   }
 
   .block-content {
