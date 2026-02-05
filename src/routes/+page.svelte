@@ -162,7 +162,8 @@
       contextStore.moveBlock(id, zone);
     }
     const count = blockIds.length;
-    uiStore.showToast(`Moved ${count > 1 ? `${count} blocks` : '1 block'} to ${zone}`, "info");
+    const zoneName = zonesStore.getZoneById(zone)?.label ?? zone;
+    uiStore.showToast(`Moved ${count > 1 ? `${count} blocks` : '1 block'} to ${zoneName}`, "info");
   }
 
   function handleZoneReorder(zone: ZoneType, blockIds: string[], insertIndex: number) {
@@ -185,7 +186,8 @@
     const newBlock = contextStore.createBlock(zone, role, content, isBuiltIn ? undefined : typeId);
     selectionStore.select(newBlock.id);
     uiStore.openModal(newBlock.id);
-    uiStore.showToast(`Created ${label} block in ${zone}`, "success");
+    const zoneName = zonesStore.getZoneById(zone)?.label ?? zone;
+    uiStore.showToast(`Created ${label} block in ${zoneName}`, "success");
   }
 
   function handleToggleZoneCollapse(zone: ZoneType) {
@@ -220,6 +222,13 @@
       contextStore.removeBlock(uiStore.modalBlockId);
       uiStore.closeModal();
       uiStore.showToast("Block removed", "success");
+    }
+  }
+
+  function handleModalContentEdit(content: string) {
+    if (uiStore.modalBlockId) {
+      contextStore.updateBlockContent(uiStore.modalBlockId, content);
+      uiStore.showToast("Content updated", "success");
     }
   }
 
@@ -439,6 +448,7 @@
   onPin={handleModalPin}
   onRemove={handleModalRemove}
   onRoleChange={handleModalRoleChange}
+  onContentEdit={handleModalContentEdit}
 />
 
 <!-- Toasts -->

@@ -129,6 +129,23 @@ function createBlock(
   return newBlock;
 }
 
+function updateBlockContent(blockId: string, content: string): void {
+  const index = getBlockIndex(blockId);
+  if (index === -1) return;
+
+  const tokens = Math.ceil(content.length / 4);
+  blocks[index] = {
+    ...blocks[index],
+    content,
+    tokens,
+    compressedVersions: {
+      ...blocks[index].compressedVersions,
+      original: { content, tokens },
+    },
+  };
+  blocks = [...blocks];
+}
+
 function setBlockRole(blockId: string, role: Role, blockType?: string): void {
   const index = getBlockIndex(blockId);
   if (index === -1) return;
@@ -286,6 +303,7 @@ export const contextStore = {
   removeBlock,
   removeBlocks,
   createBlock,
+  updateBlockContent,
   setBlockRole,
   setBlocksRole,
   reorderBlock,

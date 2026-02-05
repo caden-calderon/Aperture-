@@ -11,6 +11,7 @@
     onPin?: (position: Block["pinned"]) => void;
     onRemove?: () => void;
     onRoleChange?: (role: Role, blockType?: string) => void;
+    onContentEdit?: (content: string) => void;
   }
 
   let {
@@ -22,10 +23,15 @@
     onPin,
     onRemove,
     onRoleChange,
+    onContentEdit,
   }: Props = $props();
 
   let roleDropdownOpen = $state(false);
   let zoneDropdownOpen = $state(false);
+  let isEditing = $state(false);
+  let isContentExpanded = $state(false);
+  let editContent = $state("");
+  let textareaRef = $state<HTMLTextAreaElement | null>(null);
 
   // Get zone label for display
   const zoneLabel = $derived.by(() => {
@@ -38,6 +44,70 @@
   const displayTypeId = $derived(block?.blockType ?? block?.role ?? "user");
   const typeInfo = $derived(blockTypesStore.getTypeById(displayTypeId));
   const displayLabel = $derived(typeInfo?.label ?? displayTypeId);
+
+  // Track if content is long enough to need expand
+  const isContentLong = $derived(block ? block.content.length > 400 : false);
+
+  // Reset state when modal opens/closes or block changes
+  $effect(() => {
+    if (!open) {
+      isEditing = false;
+      isContentExpanded = false;
+      editContent = "";
+      roleDropdownOpen = false;
+      zoneDropdownOpen = false;
+    }
+  });
+
+  function enterEditMode() {
+    if (!block) return;
+    editContent = block.content;
+    isEditing = true;
+    isContentExpanded = true;
+    // Focus textarea after render
+    requestAnimationFrame(() => {
+      textareaRef?.focus();
+      // Move cursor to end
+      if (textareaRef) {
+        textareaRef.selectionStart = textareaRef.value.length;
+        textareaRef.selectionEnd = textareaRef.value.length;
+      }
+    });
+  }
+
+  function saveEdit() {
+    if (!block || editContent === block.content) {
+      isEditing = false;
+      return;
+    }
+    onContentEdit?.(editContent);
+    isEditing = false;
+  }
+
+  function cancelEdit() {
+    isEditing = false;
+    editContent = "";
+  }
+
+  function handleContentDoubleClick() {
+    if (!isEditing) {
+      enterEditMode();
+    }
+  }
+
+  function handleEditKeydown(e: KeyboardEvent) {
+    // Ctrl/Cmd+Enter to save
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      saveEdit();
+    }
+    // Escape to cancel
+    if (e.key === "Escape") {
+      e.preventDefault();
+      e.stopPropagation();
+      cancelEdit();
+    }
+  }
 
   function handleTypeSelect(typeId: string) {
     const selectedType = blockTypesStore.getTypeById(typeId);
@@ -56,11 +126,16 @@
   };
 
   function handleBackdropClick(e: MouseEvent) {
-    if (e.target === e.currentTarget) onClose?.();
+    if (e.target === e.currentTarget) {
+      if (isEditing) {
+        cancelEdit();
+      }
+      onClose?.();
+    }
   }
 
   function handleKeydown(e: KeyboardEvent) {
-    if (e.key === "Escape") onClose?.();
+    if (e.key === "Escape" && !isEditing) onClose?.();
   }
 
   function formatDate(date: Date): string {
@@ -70,6 +145,11 @@
       hour: "2-digit",
       minute: "2-digit",
     });
+  }
+
+  function getPreview(content: string): string {
+    if (content.length <= 400) return content;
+    return content.slice(0, 400) + "…";
   }
 </script>
 
@@ -84,7 +164,11 @@
     onkeydown={handleKeydown}
     tabindex="-1"
   >
-    <div class="modal" style:--role-color={roleColors[block.role]}>
+    <div
+      class="modal"
+      class:expanded={isContentExpanded}
+      style:--role-color={roleColors[block.role]}
+    >
       <div class="modal-header">
         <div class="modal-title">
           <div class="role-dropdown-container">
@@ -136,8 +220,55 @@
         </div>
       </div>
 
-      <div class="modal-content">
-        <pre>{block.content}</pre>
+      <div class="modal-content-header">
+        <div class="content-header-left">
+          {#if isEditing}
+            <span class="editing-indicator">Editing</span>
+            <span class="edit-hint">Ctrl+Enter to save · Esc to cancel</span>
+          {:else if isContentLong}
+            <button
+              class="expand-btn"
+              onclick={() => isContentExpanded = !isContentExpanded}
+            >
+              {isContentExpanded ? "Collapse" : "Expand"} content
+            </button>
+          {/if}
+        </div>
+        <div class="content-header-right">
+          {#if isEditing}
+            <button class="content-action-btn save-btn" onclick={saveEdit}>Save</button>
+            <button class="content-action-btn cancel-btn" onclick={cancelEdit}>Cancel</button>
+          {:else}
+            <button
+              class="content-action-btn edit-btn"
+              onclick={enterEditMode}
+              title="Edit content (or double-click)"
+            >
+              ✎ Edit
+            </button>
+          {/if}
+        </div>
+      </div>
+
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <div
+        class="modal-content"
+        class:editing={isEditing}
+        ondblclick={handleContentDoubleClick}
+      >
+        {#if isEditing}
+          <textarea
+            bind:this={textareaRef}
+            bind:value={editContent}
+            spellcheck="true"
+            onkeydown={handleEditKeydown}
+          ></textarea>
+        {:else}
+          <pre>{isContentExpanded ? block.content : getPreview(block.content)}</pre>
+          {#if !isContentExpanded && isContentLong}
+            <div class="content-fade"></div>
+          {/if}
+        {/if}
       </div>
 
       <div class="modal-actions">
@@ -236,6 +367,12 @@
     flex-direction: column;
     box-shadow: var(--shadow-lg);
     animation: modal-slide-in 0.2s cubic-bezier(0.34, 1.2, 0.64, 1);
+    transition: max-height 0.2s ease, max-width 0.2s ease;
+  }
+
+  .modal.expanded {
+    max-height: 90vh;
+    max-width: 700px;
   }
 
   .modal-header {
@@ -461,11 +598,116 @@
     font-variant-numeric: tabular-nums;
   }
 
+  /* Content header bar */
+  .modal-content-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 14px;
+    border-bottom: 1px solid var(--border-subtle);
+    background: var(--bg-surface);
+    min-height: 32px;
+  }
+
+  .content-header-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .content-header-right {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .editing-indicator {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    color: var(--accent);
+    padding: 2px 6px;
+    background: var(--accent-subtle);
+    border-radius: 2px;
+  }
+
+  .edit-hint {
+    font-size: 9px;
+    color: var(--text-faint);
+  }
+
+  .expand-btn {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    padding: 2px 6px;
+    border-radius: 2px;
+    border: 1px solid var(--border-default);
+    background: var(--bg-surface);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.1s ease;
+  }
+
+  .expand-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+    border-color: var(--border-strong);
+  }
+
+  .content-action-btn {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    padding: 3px 8px;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all 0.1s ease;
+  }
+
+  .edit-btn {
+    border: 1px solid var(--border-default);
+    background: var(--bg-surface);
+    color: var(--text-muted);
+  }
+
+  .edit-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+    border-color: var(--border-strong);
+  }
+
+  .save-btn {
+    border: 1px solid var(--accent);
+    background: var(--accent);
+    color: var(--bg-surface);
+    font-weight: 600;
+  }
+
+  .save-btn:hover {
+    opacity: 0.85;
+  }
+
+  .cancel-btn {
+    border: 1px solid var(--border-default);
+    background: var(--bg-surface);
+    color: var(--text-muted);
+  }
+
+  .cancel-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+  }
+
+  /* Content area */
   .modal-content {
     flex: 1;
     overflow: auto;
     padding: 14px;
     background: var(--bg-elevated);
+    position: relative;
+    cursor: text;
+    min-height: 80px;
   }
 
   .modal-content pre {
@@ -478,6 +720,41 @@
     margin: 0;
   }
 
+  .content-fade {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 30px;
+    background: linear-gradient(transparent, var(--bg-elevated));
+    pointer-events: none;
+  }
+
+  .modal-content.editing {
+    padding: 0;
+  }
+
+  .modal-content textarea {
+    width: 100%;
+    height: 100%;
+    min-height: 200px;
+    padding: 14px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    line-height: 1.55;
+    color: var(--text-secondary);
+    background: var(--bg-elevated);
+    border: none;
+    outline: none;
+    resize: none;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .modal-content textarea:focus {
+    box-shadow: inset 0 0 0 1px var(--accent);
+  }
+
   .modal-actions {
     padding: 12px 14px;
     border-top: 1px solid var(--border-subtle);
@@ -485,6 +762,7 @@
     display: flex;
     flex-direction: column;
     gap: 8px;
+    flex-shrink: 0;
   }
 
   .action-group {
