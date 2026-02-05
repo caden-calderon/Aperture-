@@ -1,13 +1,15 @@
 <script lang="ts">
   import type { Block } from "$lib/types";
+  import { blockTypesStore } from "$lib/stores";
 
   interface Props {
     block: Block;
     selected?: boolean;
     dragging?: boolean;
+    selectedIds?: Set<string>;
     onSelect?: (id: string, event: { shiftKey: boolean; ctrlKey: boolean; metaKey: boolean }) => void;
     onDoubleClick?: (id: string) => void;
-    onDragStart?: (id: string) => void;
+    onDragStart?: (ids: string[]) => void;
     onDragEnd?: () => void;
   }
 
@@ -15,27 +17,21 @@
     block,
     selected = false,
     dragging = false,
+    selectedIds = new Set<string>(),
     onSelect,
     onDoubleClick,
     onDragStart,
     onDragEnd,
   }: Props = $props();
 
-  const roleColors: Record<string, string> = {
-    system: "var(--role-system)",
-    user: "var(--role-user)",
-    assistant: "var(--role-assistant)",
-    tool_use: "var(--role-tool)",
-    tool_result: "var(--role-tool)",
-  };
+  // Count how many blocks are being dragged
+  const dragCount = $derived(selected && selectedIds.size > 1 ? selectedIds.size : 1);
 
-  const roleLabels: Record<string, string> = {
-    system: "SYS",
-    user: "USR",
-    assistant: "AST",
-    tool_use: "TOOL",
-    tool_result: "RES",
-  };
+  // Get display info: use blockType if set, otherwise use role
+  const displayTypeId = $derived(block.blockType ?? block.role);
+  const typeInfo = $derived(blockTypesStore.getTypeById(displayTypeId));
+  const displayColor = $derived(typeInfo?.color ?? "var(--text-muted)");
+  const displayLabel = $derived(typeInfo?.shortLabel ?? displayTypeId.slice(0, 4).toUpperCase());
 
   function handleClick(e: MouseEvent) {
     onSelect?.(block.id, {
@@ -50,11 +46,17 @@
   }
 
   function handleDragStart(e: DragEvent) {
+    // If this block is selected and part of a multi-selection, drag all selected
+    const idsToMove = selected && selectedIds.size > 1
+      ? [...selectedIds]
+      : [block.id];
+
     if (e.dataTransfer) {
       e.dataTransfer.effectAllowed = "move";
-      e.dataTransfer.setData("text/plain", block.id);
+      // Store as JSON array of IDs
+      e.dataTransfer.setData("text/plain", JSON.stringify(idsToMove));
     }
-    onDragStart?.(block.id);
+    onDragStart?.(idsToMove);
   }
 
   function handleDragEnd() {
@@ -77,7 +79,8 @@
   class:selected
   class:dragging
   class:pinned={block.pinned !== null}
-  style:--role-color={roleColors[block.role]}
+  style:--role-color={displayColor}
+  data-block-id={block.id}
   role="button"
   tabindex="0"
   draggable="true"
@@ -92,9 +95,12 @@
   }}
 >
   <div class="block-header">
-    <span class="role-badge">{roleLabels[block.role]}</span>
+    <span class="role-badge">{displayLabel}</span>
     {#if block.pinned}
-      <span class="pin-badge">{block.pinned === "top" ? "↑" : "↓"}</span>
+      <span class="pin-badge" title="Pinned to {block.pinned}">
+        <span class="pin-icon">📌</span>
+        <span class="pin-direction">{block.pinned === "top" ? "↑" : "↓"}</span>
+      </span>
     {/if}
     {#if block.metadata.toolName}
       <span class="tool-name">{block.metadata.toolName}</span>
@@ -108,6 +114,10 @@
 
   {#if block.compressionLevel !== "original"}
     <span class="compression-badge">{block.compressionLevel}</span>
+  {/if}
+
+  {#if dragging && dragCount > 1}
+    <span class="drag-count-badge">+{dragCount - 1}</span>
   {/if}
 </div>
 
@@ -192,9 +202,22 @@
   }
 
   .pin-badge {
+    display: flex;
+    align-items: center;
+    gap: 2px;
     font-size: 9px;
-    color: var(--text-muted);
-    opacity: 0.7;
+    padding: 1px 4px;
+    border-radius: 2px;
+    background: color-mix(in srgb, var(--semantic-warning) 20%, transparent);
+    color: var(--semantic-warning);
+  }
+
+  .pin-icon {
+    font-size: 8px;
+  }
+
+  .pin-direction {
+    font-weight: 600;
   }
 
   .tool-name {
@@ -265,5 +288,20 @@
     background: var(--bg-muted);
     padding: 1px 3px;
     border-radius: 2px;
+  }
+
+  .drag-count-badge {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--bg-surface);
+    background: var(--accent);
+    padding: 2px 5px;
+    border-radius: 10px;
+    z-index: 10;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
   }
 </style>

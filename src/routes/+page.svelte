@@ -1,16 +1,22 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { TokenBudgetBar, Zone, Modal, Toast, CommandPalette, ThemeToggle, DensityControl, TitleBar, ThemeCustomizer } from "$lib/components";
-  import { contextStore, selectionStore, uiStore, themeStore } from "$lib/stores";
+  import { TokenBudgetBar, Zone, Modal, Toast, CommandPalette, ThemeToggle, DensityControl, TitleBar, ThemeCustomizer, BlockTypeManager, ZoneManager } from "$lib/components";
+  import { contextStore, selectionStore, uiStore, themeStore, blockTypesStore, zonesStore } from "$lib/stores";
   import type { Zone as ZoneType, Block } from "$lib/types";
 
-  // Initialize theme and density on mount
+  // Initialize stores on mount
   onMount(() => {
     // Initialize theme store (loads from localStorage)
     themeStore.init();
 
     // Initialize density from localStorage
     uiStore.initDensity();
+
+    // Initialize custom block types
+    blockTypesStore.init();
+
+    // Initialize zones store
+    zonesStore.init();
 
     // Load demo data
     contextStore.loadDemoData();
@@ -73,17 +79,43 @@
     uiStore.openModal(id);
   }
 
-  function handleBlockDragStart(id: string) {
-    uiStore.startDrag(id);
+  function handleBlockDragStart(ids: string[]) {
+    uiStore.startDrag(ids);
   }
 
   function handleBlockDragEnd() {
     uiStore.endDrag();
   }
 
-  function handleZoneDrop(zone: ZoneType, blockId: string) {
-    contextStore.moveBlock(blockId, zone);
-    uiStore.showToast(`Moved to ${zone}`, "info");
+  function handleZoneDrop(zone: ZoneType, blockIds: string[]) {
+    for (const id of blockIds) {
+      contextStore.moveBlock(id, zone);
+    }
+    const count = blockIds.length;
+    uiStore.showToast(`Moved ${count > 1 ? `${count} blocks` : '1 block'} to ${zone}`, "info");
+  }
+
+  function handleZoneReorder(zone: ZoneType, blockIds: string[], insertIndex: number) {
+    contextStore.reorderBlocksInZone(zone, blockIds, insertIndex);
+    const count = blockIds.length;
+    uiStore.showToast(`Reordered ${count > 1 ? `${count} blocks` : 'block'}`, "info");
+  }
+
+  function handleCreateBlock(zone: ZoneType, typeId: string) {
+    // Create a new block with the specified type
+    const blockTypeInfo = blockTypesStore.getTypeById(typeId);
+    const label = blockTypeInfo?.label ?? typeId;
+
+    // Determine role: built-in types use their ID as role, custom types default to "user"
+    const isBuiltIn = blockTypeInfo?.isBuiltIn ?? false;
+    const role: Block["role"] = isBuiltIn ? (typeId as Block["role"]) : "user";
+    const content = `New ${label} block`;
+
+    // Pass blockType for custom types so display knows which type this is
+    const newBlock = contextStore.createBlock(zone, role, content, isBuiltIn ? undefined : typeId);
+    selectionStore.select(newBlock.id);
+    uiStore.openModal(newBlock.id);
+    uiStore.showToast(`Created ${label} block in ${zone}`, "success");
   }
 
   function handleToggleZoneCollapse(zone: ZoneType) {
@@ -118,6 +150,16 @@
       contextStore.removeBlock(uiStore.modalBlockId);
       uiStore.closeModal();
       uiStore.showToast("Block removed", "success");
+    }
+  }
+
+  function handleModalRoleChange(role: Block["role"], blockType?: string) {
+    if (uiStore.modalBlockId) {
+      contextStore.setBlockRole(uiStore.modalBlockId, role, blockType);
+      const label = blockType
+        ? blockTypesStore.getTypeById(blockType)?.label ?? blockType
+        : role;
+      uiStore.showToast(`Changed type to ${label}`, "success");
     }
   }
 
@@ -221,31 +263,11 @@
         </button>
       </section>
 
-      <section class="sidebar-section">
-        <h3 class="sidebar-heading">Block Types</h3>
-        <div class="type-list">
-          <div class="type-item">
-            <span class="type-dot" style="background: var(--role-system)"></span>
-            <span class="type-label">system</span>
-            <span class="type-count">{formatNumber(contextStore.tokenBudget.byRole.system)}</span>
-          </div>
-          <div class="type-item">
-            <span class="type-dot" style="background: var(--role-user)"></span>
-            <span class="type-label">user</span>
-            <span class="type-count">{formatNumber(contextStore.tokenBudget.byRole.user)}</span>
-          </div>
-          <div class="type-item">
-            <span class="type-dot" style="background: var(--role-assistant)"></span>
-            <span class="type-label">assistant</span>
-            <span class="type-count">{formatNumber(contextStore.tokenBudget.byRole.assistant)}</span>
-          </div>
-          <div class="type-item">
-            <span class="type-dot" style="background: var(--role-tool)"></span>
-            <span class="type-label">tool</span>
-            <span class="type-count">{formatNumber(contextStore.tokenBudget.byRole.tool_use + contextStore.tokenBudget.byRole.tool_result)}</span>
-          </div>
-        </div>
-      </section>
+      <!-- Block Types Manager -->
+      <BlockTypeManager />
+
+      <!-- Zone Manager -->
+      <ZoneManager />
 
       <section class="sidebar-section">
         <h3 class="sidebar-heading">Display</h3>
@@ -296,47 +318,24 @@
 
       <!-- Zones -->
       <div class="zones">
-        <Zone
-          zone="primacy"
-          blocks={contextStore.blocksByZone.primacy}
-          collapsed={uiStore.isZoneCollapsed("primacy")}
-          selectedIds={selectionStore.selectedIds}
-          draggingBlockId={uiStore.draggingBlockId}
-          onToggleCollapse={() => handleToggleZoneCollapse("primacy")}
-          onBlockSelect={handleBlockSelect}
-          onBlockDoubleClick={handleBlockDoubleClick}
-          onBlockDragStart={handleBlockDragStart}
-          onBlockDragEnd={handleBlockDragEnd}
-          onDrop={handleZoneDrop}
-        />
-
-        <Zone
-          zone="middle"
-          blocks={contextStore.blocksByZone.middle}
-          collapsed={uiStore.isZoneCollapsed("middle")}
-          selectedIds={selectionStore.selectedIds}
-          draggingBlockId={uiStore.draggingBlockId}
-          onToggleCollapse={() => handleToggleZoneCollapse("middle")}
-          onBlockSelect={handleBlockSelect}
-          onBlockDoubleClick={handleBlockDoubleClick}
-          onBlockDragStart={handleBlockDragStart}
-          onBlockDragEnd={handleBlockDragEnd}
-          onDrop={handleZoneDrop}
-        />
-
-        <Zone
-          zone="recency"
-          blocks={contextStore.blocksByZone.recency}
-          collapsed={uiStore.isZoneCollapsed("recency")}
-          selectedIds={selectionStore.selectedIds}
-          draggingBlockId={uiStore.draggingBlockId}
-          onToggleCollapse={() => handleToggleZoneCollapse("recency")}
-          onBlockSelect={handleBlockSelect}
-          onBlockDoubleClick={handleBlockDoubleClick}
-          onBlockDragStart={handleBlockDragStart}
-          onBlockDragEnd={handleBlockDragEnd}
-          onDrop={handleZoneDrop}
-        />
+        {#each zonesStore.zonesByDisplayOrder as zoneConfig (zoneConfig.id)}
+          <Zone
+            zone={zoneConfig.id as ZoneType}
+            blocks={contextStore.blocksByZone[zoneConfig.id] ?? []}
+            collapsed={uiStore.isZoneCollapsed(zoneConfig.id)}
+            selectedIds={selectionStore.selectedIds}
+            draggingBlockIds={uiStore.draggingBlockIds}
+            onToggleCollapse={() => handleToggleZoneCollapse(zoneConfig.id as ZoneType)}
+            onBlockSelect={handleBlockSelect}
+            onBlockDoubleClick={handleBlockDoubleClick}
+            onBlockDragStart={handleBlockDragStart}
+            onBlockDragEnd={handleBlockDragEnd}
+            onDrop={handleZoneDrop}
+            onCreateBlock={handleCreateBlock}
+            onReorder={handleZoneReorder}
+            --zone-color={zoneConfig.color}
+          />
+        {/each}
       </div>
     </div>
   </main>
@@ -351,6 +350,7 @@
   onMove={handleModalMove}
   onPin={handleModalPin}
   onRemove={handleModalRemove}
+  onRoleChange={handleModalRoleChange}
 />
 
 <!-- Toasts -->
@@ -544,40 +544,6 @@
   }
 
   .snapshot-meta {
-    font-size: 9px;
-    color: var(--text-muted);
-    font-variant-numeric: tabular-nums;
-  }
-
-  /* Type list */
-  .type-list {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
-
-  .type-item {
-    display: flex;
-    align-items: center;
-    gap: var(--space-sm);
-    padding: 3px 0;
-    font-size: 11px;
-  }
-
-  .type-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 1px;
-    flex-shrink: 0;
-  }
-
-  .type-label {
-    color: var(--text-secondary);
-    flex: 1;
-    font-size: 10px;
-  }
-
-  .type-count {
     font-size: 9px;
     color: var(--text-muted);
     font-variant-numeric: tabular-nums;

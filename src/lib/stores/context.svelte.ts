@@ -5,7 +5,7 @@
  * Uses Svelte 5 runes for reactive state management
  */
 
-import type { Block, Zone, TokenBudget, Snapshot } from "../types";
+import type { Block, Zone, TokenBudget, Snapshot, Role } from "../types";
 import {
   generateDemoBlocks,
   generateDemoSnapshots,
@@ -24,10 +24,33 @@ const tokenLimit = 200000;
 // Derived State
 // ============================================================================
 
-const blocksByZone = $derived({
-  primacy: blocks.filter((b) => b.zone === "primacy"),
-  middle: blocks.filter((b) => b.zone === "middle"),
-  recency: blocks.filter((b) => b.zone === "recency"),
+// Sort blocks within zone: pinned top first, then unpinned, then pinned bottom
+function sortBlocksWithPins(zoneBlocks: Block[]): Block[] {
+  const pinnedTop = zoneBlocks.filter((b) => b.pinned === "top");
+  const pinnedBottom = zoneBlocks.filter((b) => b.pinned === "bottom");
+  const unpinned = zoneBlocks.filter((b) => b.pinned === null);
+  return [...pinnedTop, ...unpinned, ...pinnedBottom];
+}
+
+// Dynamic blocks by zone - supports custom zones
+const blocksByZone = $derived.by(() => {
+  const result: Record<string, Block[]> = {};
+  // Group blocks by zone and sort with pins
+  const grouped = new Map<string, Block[]>();
+  for (const block of blocks) {
+    const zoneBlocks = grouped.get(block.zone) ?? [];
+    zoneBlocks.push(block);
+    grouped.set(block.zone, zoneBlocks);
+  }
+  // Sort each zone's blocks with pins
+  for (const [zoneId, zoneBlocks] of grouped) {
+    result[zoneId] = sortBlocksWithPins(zoneBlocks);
+  }
+  // Ensure built-in zones exist even if empty
+  if (!result.primacy) result.primacy = [];
+  if (!result.middle) result.middle = [];
+  if (!result.recency) result.recency = [];
+  return result;
 });
 
 const tokenBudget = $derived<TokenBudget>(calculateTokenBudget(blocks));
@@ -74,6 +97,50 @@ function removeBlocks(blockIds: string[]): void {
   blocks = blocks.filter((b) => !idSet.has(b.id));
 }
 
+function createBlock(
+  zone: Zone,
+  role: Role,
+  content = "",
+  blockType?: string
+): Block {
+  const defaultContent = content || `New ${role} block`;
+  const newBlock: Block = {
+    id: `block-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    role,
+    blockType,
+    content: defaultContent,
+    tokens: Math.ceil(defaultContent.length / 4),
+    timestamp: new Date(),
+    zone,
+    pinned: null,
+    compressionLevel: "original",
+    compressedVersions: {
+      original: { content: defaultContent, tokens: Math.ceil(defaultContent.length / 4) },
+    },
+    usageHeat: 0.5,
+    positionRelevance: 0.5,
+    lastReferencedTurn: 0,
+    referenceCount: 0,
+    topicCluster: null,
+    topicKeywords: [],
+    metadata: { provider: "manual", turnIndex: blocks.length, filePaths: [] },
+  };
+  blocks = [...blocks, newBlock];
+  return newBlock;
+}
+
+function setBlockRole(blockId: string, role: Role, blockType?: string): void {
+  const index = getBlockIndex(blockId);
+  if (index === -1) return;
+  blocks[index] = { ...blocks[index], role, blockType };
+  blocks = [...blocks];
+}
+
+function setBlocksRole(blockIds: string[], role: Role): void {
+  const idSet = new Set(blockIds);
+  blocks = blocks.map((b) => (idSet.has(b.id) ? { ...b, role } : b));
+}
+
 function reorderBlock(blockId: string, newIndex: number): void {
   const currentIndex = getBlockIndex(blockId);
   if (currentIndex === -1) return;
@@ -83,6 +150,42 @@ function reorderBlock(blockId: string, newIndex: number): void {
   newBlocks.splice(currentIndex, 1);
   newBlocks.splice(newIndex, 0, block);
   blocks = newBlocks;
+}
+
+function reorderBlocksInZone(
+  zone: Zone,
+  blockIds: string[],
+  insertIndex: number
+): void {
+  // Get sorted zone blocks (with pins in correct positions)
+  const zoneBlocks = sortBlocksWithPins(blocks.filter((b) => b.zone === zone));
+  const otherBlocks = blocks.filter((b) => b.zone !== zone);
+  const idSet = new Set(blockIds);
+
+  // Check if we're trying to move pinned blocks - don't allow
+  const movingPinnedBlocks = zoneBlocks.filter(
+    (b) => idSet.has(b.id) && b.pinned !== null
+  );
+  if (movingPinnedBlocks.length > 0) {
+    // Don't move pinned blocks via drag
+    return;
+  }
+
+  const movingBlocks = zoneBlocks.filter((b) => idSet.has(b.id));
+  const stayingBlocks = zoneBlocks.filter((b) => !idSet.has(b.id));
+
+  // Calculate valid insert range (between pinned-top and pinned-bottom)
+  const pinnedTopCount = stayingBlocks.filter((b) => b.pinned === "top").length;
+  const pinnedBottomCount = stayingBlocks.filter((b) => b.pinned === "bottom").length;
+  const minIndex = pinnedTopCount;
+  const maxIndex = stayingBlocks.length - pinnedBottomCount;
+
+  // Clamp insert index to valid range
+  const clampedIndex = Math.max(minIndex, Math.min(insertIndex, maxIndex));
+  stayingBlocks.splice(clampedIndex, 0, ...movingBlocks);
+
+  // Reconstruct blocks array maintaining zone order
+  blocks = [...otherBlocks, ...stayingBlocks];
 }
 
 function setCompressionLevel(
@@ -102,6 +205,17 @@ function pinBlock(blockId: string, position: Block["pinned"]): void {
 
   blocks[index] = { ...blocks[index], pinned: position };
   blocks = [...blocks];
+}
+
+// Get valid drop index range for a zone (respecting pinned blocks)
+function getValidDropRange(zone: Zone): { min: number; max: number } {
+  const zoneBlocks = sortBlocksWithPins(blocks.filter((b) => b.zone === zone));
+  const pinnedTopCount = zoneBlocks.filter((b) => b.pinned === "top").length;
+  const pinnedBottomCount = zoneBlocks.filter((b) => b.pinned === "bottom").length;
+  return {
+    min: pinnedTopCount,
+    max: zoneBlocks.length - pinnedBottomCount,
+  };
 }
 
 function updateBlockHeat(blockId: string, heat: number): void {
@@ -171,9 +285,14 @@ export const contextStore = {
   moveBlocks,
   removeBlock,
   removeBlocks,
+  createBlock,
+  setBlockRole,
+  setBlocksRole,
   reorderBlock,
+  reorderBlocksInZone,
   setCompressionLevel,
   pinBlock,
+  getValidDropRange,
   updateBlockHeat,
   saveSnapshot,
   restoreSnapshot,

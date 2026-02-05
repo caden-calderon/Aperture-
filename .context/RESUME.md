@@ -452,3 +452,89 @@ make test-ui     # Frontend tests
 - `themeStore.effectiveColors` - Get current effective colors
 
 **Phase 0 status: ONGOING** (user has more requests)
+
+---
+
+### 2026-02-04: Theme Refinements & Multi-Drag
+
+**Completed:**
+- ✅ Extended ThemeColors with role colors (roleSystem, roleUser, roleAssistant, roleTool)
+- ✅ Extended ThemeColors with semantic colors (semanticDanger, semanticWarning, semanticSuccess)
+- ✅ Updated all 13 presets with appropriate role/semantic colors per theme aesthetic
+- ✅ Theme colors now apply via CSS variables (--role-system, --role-user, etc.)
+- ✅ Grouped color pickers in ThemeCustomizer (Background, Border, Text, Accent, Block Types, Semantic)
+- ✅ Hex tooltip on palette swatches - shows hex code after 500ms hover
+- ✅ **Multi-drag support** - select multiple blocks and drag them all at once
+  - Badge shows count when dragging multiple (e.g., "+3")
+  - Drop indicator shows "Drop 4 blocks to Recency"
+- ✅ Custom block types system (blockTypesStore)
+  - Built-in types: system, user, assistant, tool_use, tool_result
+  - Add/edit/delete custom types with label, short label, color
+  - Persisted to localStorage
+- ✅ BlockTypeManager component in sidebar (collapsible)
+- ✅ All checks pass (svelte-check, clippy)
+
+**New Components:**
+- `BlockTypeManager.svelte` - Manage block types (view built-in, CRUD custom)
+
+**New Store:**
+- `blockTypesStore` - Manages built-in and custom block types
+
+**Theme Color Keys (18 total):**
+- Background: bgBase, bgSurface, bgElevated, bgHover, bgMuted
+- Border: borderSubtle, borderDefault
+- Text: textPrimary, textSecondary, textMuted
+- Accent: accent
+- Block Types: roleSystem, roleUser, roleAssistant, roleTool
+- Semantic: semanticDanger, semanticWarning, semanticSuccess
+
+**Phase 0 status: ONGOING**
+
+---
+
+### 2026-02-04: Block Management & Custom Zones
+
+**Completed:**
+- ✅ **Pin functionality** - Blocks can be pinned to top/bottom of zone
+  - Pinned blocks stay in position, unpinned blocks flow around them
+  - Can't drag non-pinned blocks past pinned ones
+  - Visual pin indicator (📌 with ↑/↓ direction)
+- ✅ **Click block type to select all** - Click type in sidebar selects all blocks of that type
+- ✅ **Click block type to assign** - With selection, click type assigns all selected blocks
+- ✅ **Modal role dropdown** - Click role badge in modal to change block type (includes custom types)
+- ✅ **Drag-to-create blocks** - Drag block type from sidebar to zone creates new block
+- ✅ **Custom block types display correctly** - Shows proper label/color for custom types
+- ✅ **Within-zone reordering** - Drag blocks within zone to reorder, respects pins
+- ✅ **Custom zones system** (zonesStore)
+  - Built-in zones: Primacy, Middle, Recency
+  - Add/edit/delete custom zones
+  - Two orderings: displayOrder (UI) and contextOrder (LLM context)
+  - Primacy always first, Recency always last in context
+- ✅ **ZoneManager component** - Sidebar zone management with drag reorder
+- ✅ **Dynamic zone rendering** - Main area renders zones from store
+
+**New Files:**
+- `src/lib/stores/zones.svelte.ts` - Zone management store
+
+**Key Architecture:**
+- `Block.blockType` - Optional custom type ID (display), separate from `role` (API)
+- `Zone` type now accepts custom zone IDs
+- `TokenBudget.byZone` is `Record<string, number>` for dynamic zones
+- Context order: Primacy(0) → Middle(50) → Custom(60-999) → Recency(1000)
+
+---
+
+### Next Session: UI Polish & Bug Fixes
+
+**Bugs to Fix:**
+- [ ] Creating new zone incorrectly creates a block type (adds to Block Types)
+- [ ] Sidebar has horizontal scroll - should be resizable instead
+
+**Features to Add:**
+- [ ] **Edit built-in zone colors/names** - Allow renaming "Recency" to "Recent", changing colors
+- [ ] **Zone scrolling** - Scroll within zones when content overflows
+- [ ] **Main scroll** - Scroll through all zones (expand all zones and scroll through them)
+- [ ] **Dynamic zone resizing** - Resize individual zones (drag handles)
+- [ ] **Resizable sidebar** - Drag to resize sidebar width (with max cap to not eat main area)
+
+**Phase 0 status: ONGOING**

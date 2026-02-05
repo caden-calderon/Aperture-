@@ -1,5 +1,6 @@
 <script lang="ts">
-  import type { Block } from "$lib/types";
+  import type { Block, Role } from "$lib/types";
+  import { blockTypesStore } from "$lib/stores";
 
   interface Props {
     block: Block | null;
@@ -9,6 +10,7 @@
     onMove?: (zone: Block["zone"]) => void;
     onPin?: (position: Block["pinned"]) => void;
     onRemove?: () => void;
+    onRoleChange?: (role: Role, blockType?: string) => void;
   }
 
   let {
@@ -19,7 +21,23 @@
     onMove,
     onPin,
     onRemove,
+    onRoleChange,
   }: Props = $props();
+
+  let roleDropdownOpen = $state(false);
+
+  // Get display info for current block
+  const displayTypeId = $derived(block?.blockType ?? block?.role ?? "user");
+  const typeInfo = $derived(blockTypesStore.getTypeById(displayTypeId));
+  const displayLabel = $derived(typeInfo?.label ?? displayTypeId);
+
+  function handleTypeSelect(typeId: string) {
+    const selectedType = blockTypesStore.getTypeById(typeId);
+    const isBuiltIn = selectedType?.isBuiltIn ?? false;
+    const role: Role = isBuiltIn ? (typeId as Role) : "user";
+    onRoleChange?.(role, isBuiltIn ? undefined : typeId);
+    roleDropdownOpen = false;
+  }
 
   const roleColors: Record<string, string> = {
     system: "var(--role-system)",
@@ -61,7 +79,29 @@
     <div class="modal" style:--role-color={roleColors[block.role]}>
       <div class="modal-header">
         <div class="modal-title">
-          <span class="role-badge">{block.role.toUpperCase()}</span>
+          <div class="role-dropdown-container">
+            <button
+              class="role-badge role-badge-clickable"
+              onclick={() => roleDropdownOpen = !roleDropdownOpen}
+              title="Click to change type"
+            >
+              {displayLabel.toUpperCase()} <span class="dropdown-arrow">▼</span>
+            </button>
+            {#if roleDropdownOpen}
+              <div class="role-dropdown">
+                {#each blockTypesStore.allTypes as type (type.id)}
+                  <button
+                    class="role-dropdown-item"
+                    class:active={displayTypeId === type.id}
+                    onclick={() => handleTypeSelect(type.id)}
+                  >
+                    <span class="type-dot" style:background={type.color}></span>
+                    {type.label}
+                  </button>
+                {/each}
+              </div>
+            {/if}
+          </div>
           {#if block.metadata.toolName}
             <span class="tool-name">{block.metadata.toolName}</span>
           {/if}
@@ -185,6 +225,10 @@
     gap: 8px;
   }
 
+  .role-dropdown-container {
+    position: relative;
+  }
+
   .role-badge {
     font-family: var(--font-mono);
     font-size: 9px;
@@ -194,6 +238,73 @@
     background: color-mix(in srgb, var(--role-color) 18%, transparent);
     color: var(--role-color);
     letter-spacing: 0.2px;
+  }
+
+  .role-badge-clickable {
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: all 0.1s ease;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .role-badge-clickable:hover {
+    border-color: var(--role-color);
+    background: color-mix(in srgb, var(--role-color) 25%, transparent);
+  }
+
+  .dropdown-arrow {
+    font-size: 7px;
+    opacity: 0.7;
+  }
+
+  .role-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    margin-top: 4px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-default);
+    border-radius: 4px;
+    box-shadow: var(--shadow-md);
+    z-index: 100;
+    min-width: 100px;
+    overflow: hidden;
+  }
+
+  .role-dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 6px 10px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    text-align: left;
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: background 0.1s ease;
+  }
+
+  .role-dropdown-item:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+  }
+
+  .role-dropdown-item.active {
+    background: var(--accent-subtle);
+    color: var(--text-primary);
+    font-weight: 600;
+  }
+
+  .type-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 1px;
+    flex-shrink: 0;
   }
 
   .tool-name {

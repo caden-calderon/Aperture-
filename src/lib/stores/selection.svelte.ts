@@ -77,9 +77,20 @@ function selectAll(): void {
   selectedIds = new Set(contextStore.blocks.map((b) => b.id));
 }
 
-function selectZone(zone: "primacy" | "middle" | "recency"): void {
-  const zoneBlocks = contextStore.blocksByZone[zone];
+function selectZone(zone: string): void {
+  const zoneBlocks = contextStore.blocksByZone[zone] ?? [];
   selectedIds = new Set(zoneBlocks.map((b) => b.id));
+  lastSelectedIndex =
+    zoneBlocks.length > 0 ? contextStore.getBlockIndex(zoneBlocks[0].id) : null;
+}
+
+function selectByRole(role: string): void {
+  const matchingBlocks = contextStore.blocks.filter((b) => b.role === role);
+  selectedIds = new Set(matchingBlocks.map((b) => b.id));
+  lastSelectedIndex =
+    matchingBlocks.length > 0
+      ? contextStore.getBlockIndex(matchingBlocks[0].id)
+      : null;
 }
 
 function deselect(): void {
@@ -133,6 +144,7 @@ export const selectionStore = {
   rangeSelect,
   selectAll,
   selectZone,
+  selectByRole,
   deselect,
   isSelected,
   handleClick,

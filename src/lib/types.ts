@@ -9,7 +9,8 @@
 
 export type Role = "system" | "user" | "assistant" | "tool_use" | "tool_result";
 
-export type Zone = "primacy" | "middle" | "recency";
+// Built-in zones + custom zones (custom zones are string IDs like "zone-123")
+export type Zone = "primacy" | "middle" | "recency" | (string & {});
 
 export type PinPosition = "top" | "bottom";
 
@@ -37,6 +38,7 @@ export interface BlockMetadata {
 export interface Block {
   id: string;
   role: Role;
+  blockType?: string; // Custom block type ID (for display), falls back to role if not set
   content: string;
   tokens: number;
   timestamp: Date;
@@ -111,11 +113,7 @@ export interface UIState {
 export interface TokenBudget {
   used: number;
   limit: number;
-  byZone: {
-    primacy: number;
-    middle: number;
-    recency: number;
-  };
+  byZone: Record<string, number>; // Dynamic zones
   byRole: Record<Role, number>;
 }
 

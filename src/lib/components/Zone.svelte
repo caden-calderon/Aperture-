@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Block, Zone as ZoneType } from "$lib/types";
+  import { contextStore, zonesStore } from "$lib/stores";
   import ContextBlock from "./ContextBlock.svelte";
 
   interface Props {
@@ -7,13 +8,15 @@
     blocks: Block[];
     collapsed?: boolean;
     selectedIds?: Set<string>;
-    draggingBlockId?: string | null;
+    draggingBlockIds?: string[];
     onToggleCollapse?: () => void;
     onBlockSelect?: (id: string, event: { shiftKey: boolean; ctrlKey: boolean; metaKey: boolean }) => void;
     onBlockDoubleClick?: (id: string) => void;
-    onBlockDragStart?: (id: string) => void;
+    onBlockDragStart?: (ids: string[]) => void;
     onBlockDragEnd?: () => void;
-    onDrop?: (zone: ZoneType, blockId: string) => void;
+    onDrop?: (zone: ZoneType, blockIds: string[]) => void;
+    onCreateBlock?: (zone: ZoneType, typeId: string) => void;
+    onReorder?: (zone: ZoneType, blockIds: string[], insertIndex: number) => void;
   }
 
   let {
@@ -21,36 +24,46 @@
     blocks,
     collapsed = false,
     selectedIds = new Set<string>(),
-    draggingBlockId = null,
+    draggingBlockIds = [],
     onToggleCollapse,
     onBlockSelect,
     onBlockDoubleClick,
     onBlockDragStart,
     onBlockDragEnd,
     onDrop,
+    onCreateBlock,
+    onReorder,
   }: Props = $props();
 
   let isDragOver = $state(false);
+  let isTypeDropOver = $state(false);
+  let dropInsertIndex = $state<number | null>(null);
+  let zoneContentRef = $state<HTMLElement | null>(null);
+  let dragEnterCount = $state(0); // Track nested drag enter/leave events
 
-  const zoneConfig: Record<ZoneType, { label: string; color: string; description: string }> = {
-    primacy: {
-      label: "Primacy",
-      color: "var(--zone-primacy)",
-      description: "High priority, always included",
-    },
-    middle: {
-      label: "Middle",
-      color: "var(--zone-middle)",
-      description: "Standard context, compressed as needed",
-    },
-    recency: {
-      label: "Recency",
-      color: "var(--zone-recency)",
-      description: "Recent context, high position relevance",
-    },
-  };
-
-  const config = $derived(zoneConfig[zone]);
+  // Get zone config from store (supports custom zones)
+  const config = $derived.by(() => {
+    const zoneInfo = zonesStore.getZoneById(zone);
+    if (zoneInfo) {
+      return {
+        label: zoneInfo.label,
+        color: zoneInfo.color,
+        description: zoneInfo.isBuiltIn
+          ? zone === "primacy"
+            ? "High priority, always included"
+            : zone === "recency"
+              ? "Recent context, high position relevance"
+              : "Standard context, compressed as needed"
+          : "Custom zone",
+      };
+    }
+    // Fallback for unknown zones
+    return {
+      label: zone,
+      color: "var(--text-muted)",
+      description: "Unknown zone",
+    };
+  });
   let totalTokens = $derived(blocks.reduce((sum, b) => sum + b.tokens, 0));
   let selectedInZone = $derived(blocks.filter((b) => selectedIds.has(b.id)));
 
@@ -59,30 +72,128 @@
     return n.toString();
   }
 
-  function handleDragOver(e: DragEvent) {
+  function handleDragEnter(e: DragEvent) {
     e.preventDefault();
-    if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
-    isDragOver = true;
+    dragEnterCount++;
   }
 
-  function handleDragLeave() {
-    isDragOver = false;
+  function handleDragOver(e: DragEvent) {
+    e.preventDefault();
+    if (!e.dataTransfer) return;
+
+    // Check if it's a block type being dragged from sidebar
+    const hasBlockType = e.dataTransfer.types.includes('application/x-block-type');
+
+    if (hasBlockType) {
+      e.dataTransfer.dropEffect = "copy";
+      isTypeDropOver = true;
+      isDragOver = false;
+      dropInsertIndex = null;
+    } else {
+      e.dataTransfer.dropEffect = "move";
+      isDragOver = true;
+      isTypeDropOver = false;
+
+      // Calculate insertion index based on mouse position
+      if (zoneContentRef && blocks.length > 0) {
+        const blockElements = zoneContentRef.querySelectorAll('[data-block-id]');
+        let insertIdx = blocks.length; // Default to end
+
+        for (let i = 0; i < blockElements.length; i++) {
+          const rect = blockElements[i].getBoundingClientRect();
+          const midY = rect.top + rect.height / 2;
+          if (e.clientY < midY) {
+            insertIdx = i;
+            break;
+          }
+        }
+
+        // Clamp to valid range (respecting pinned blocks)
+        const { min, max } = contextStore.getValidDropRange(zone);
+        insertIdx = Math.max(min, Math.min(insertIdx, max));
+
+        // Only update if changed to reduce re-renders
+        if (dropInsertIndex !== insertIdx) {
+          dropInsertIndex = insertIdx;
+        }
+      } else if (dropInsertIndex !== 0) {
+        dropInsertIndex = 0;
+      }
+    }
+  }
+
+  function handleDragLeave(e: DragEvent) {
+    e.preventDefault();
+    dragEnterCount--;
+    // Only reset when truly leaving the zone (counter reaches 0)
+    if (dragEnterCount <= 0) {
+      dragEnterCount = 0;
+      isDragOver = false;
+      isTypeDropOver = false;
+      dropInsertIndex = null;
+    }
   }
 
   function handleDrop(e: DragEvent) {
     e.preventDefault();
+    const currentInsertIndex = dropInsertIndex;
     isDragOver = false;
-    const blockId = e.dataTransfer?.getData("text/plain");
-    if (blockId && onDrop) onDrop(zone, blockId);
+    isTypeDropOver = false;
+    dropInsertIndex = null;
+    dragEnterCount = 0;
+
+    // Check if it's a block type drop (create new block)
+    const typeData = e.dataTransfer?.getData("application/x-block-type");
+    if (typeData && onCreateBlock) {
+      try {
+        const parsed = JSON.parse(typeData);
+        if (parsed.action === 'create' && parsed.typeId) {
+          onCreateBlock(zone, parsed.typeId);
+          return;
+        }
+      } catch {
+        // Not a valid block type data
+      }
+    }
+
+    // Otherwise, it's a block move
+    const data = e.dataTransfer?.getData("text/plain");
+    if (data) {
+      try {
+        // Try parsing as JSON array
+        const blockIds: string[] = JSON.parse(data);
+        if (Array.isArray(blockIds)) {
+          // Check if blocks are from this zone (reorder) or different zone (move)
+          const allFromThisZone = blockIds.every((id) =>
+            blocks.some((b) => b.id === id)
+          );
+
+          if (allFromThisZone && onReorder && currentInsertIndex !== null) {
+            onReorder(zone, blockIds, currentInsertIndex);
+          } else if (onDrop) {
+            onDrop(zone, blockIds);
+          }
+        } else if (onDrop) {
+          // Fallback for single ID
+          onDrop(zone, [data]);
+        }
+      } catch {
+        // Fallback for plain string ID
+        if (onDrop) {
+          onDrop(zone, [data]);
+        }
+      }
+    }
   }
 </script>
 
 <section
   class="zone"
   class:collapsed
-  class:drag-over={isDragOver && draggingBlockId !== null}
+  class:drag-over={(isDragOver && draggingBlockIds.length > 0) || isTypeDropOver}
   style:--zone-color={config.color}
   aria-label="{config.label} zone"
+  ondragenter={handleDragEnter}
   ondragover={handleDragOver}
   ondragleave={handleDragLeave}
   ondrop={handleDrop}
@@ -107,28 +218,39 @@
   </button>
 
   {#if !collapsed}
-    <div class="zone-content">
+    <div class="zone-content" bind:this={zoneContentRef}>
       {#if blocks.length === 0}
         <div class="zone-empty">Drop blocks here</div>
       {:else}
-        {#each blocks as block (block.id)}
+        {#each blocks as block, index (block.id)}
+          {#if dropInsertIndex === index && isDragOver}
+            <div class="drop-line"></div>
+          {/if}
           <ContextBlock
             {block}
             selected={selectedIds.has(block.id)}
-            dragging={draggingBlockId === block.id}
+            dragging={draggingBlockIds.includes(block.id)}
+            {selectedIds}
             onSelect={onBlockSelect}
             onDoubleClick={onBlockDoubleClick}
             onDragStart={onBlockDragStart}
             onDragEnd={onBlockDragEnd}
           />
         {/each}
+        {#if dropInsertIndex === blocks.length && isDragOver}
+          <div class="drop-line"></div>
+        {/if}
       {/if}
     </div>
   {/if}
 
-  {#if isDragOver && draggingBlockId !== null}
+  {#if isTypeDropOver}
+    <div class="drop-indicator drop-indicator-create">
+      <span>+ Create block in {config.label}</span>
+    </div>
+  {:else if isDragOver && draggingBlockIds.length > 0}
     <div class="drop-indicator">
-      <span>Drop to move to {config.label}</span>
+      <span>Drop {draggingBlockIds.length > 1 ? `${draggingBlockIds.length} blocks` : ''} to {config.label}</span>
     </div>
   {/if}
 </section>
@@ -250,6 +372,20 @@
     margin: 4px 0;
   }
 
+  .drop-line {
+    height: 2px;
+    background: var(--zone-color);
+    border-radius: 1px;
+    margin: 2px 0;
+    box-shadow: 0 0 4px var(--zone-color);
+    animation: pulse-line 0.8s ease-in-out infinite;
+  }
+
+  @keyframes pulse-line {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+  }
+
   .drop-indicator {
     position: absolute;
     inset: 0;
@@ -270,5 +406,13 @@
     padding: 6px 12px;
     background: var(--zone-color);
     border-radius: 4px;
+  }
+
+  .drop-indicator-create {
+    background: color-mix(in srgb, var(--semantic-success) 10%, var(--bg-base) 80%);
+  }
+
+  .drop-indicator-create span {
+    background: var(--semantic-success);
   }
 </style>

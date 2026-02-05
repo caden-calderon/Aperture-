@@ -13,3 +13,5 @@ export { default as ThemeToggle } from "./ThemeToggle.svelte";
 export { default as DensityControl } from "./DensityControl.svelte";
 export { default as TitleBar } from "./TitleBar.svelte";
 export { default as ThemeCustomizer } from "./ThemeCustomizer.svelte";
+export { default as BlockTypeManager } from "./BlockTypeManager.svelte";
+export { default as ZoneManager } from "./ZoneManager.svelte";

@@ -307,7 +307,7 @@ export function calculateTokenBudget(blocks: Block[]): TokenBudget {
   const budget: TokenBudget = {
     used: 0,
     limit: 200000,
-    byZone: { primacy: 0, middle: 0, recency: 0 },
+    byZone: { primacy: 0, middle: 0, recency: 0 }, // Initialize built-in zones
     byRole: {
       system: 0,
       user: 0,
@@ -319,6 +319,10 @@ export function calculateTokenBudget(blocks: Block[]): TokenBudget {
 
   for (const block of blocks) {
     budget.used += block.tokens;
+    // Initialize zone if not exists (for custom zones)
+    if (!(block.zone in budget.byZone)) {
+      budget.byZone[block.zone] = 0;
+    }
     budget.byZone[block.zone] += block.tokens;
     budget.byRole[block.role] += block.tokens;
   }
