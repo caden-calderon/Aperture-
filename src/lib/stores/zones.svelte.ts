@@ -56,6 +56,12 @@ const BUILT_IN_ZONES: ZoneConfig[] = [
 
 let customZones = $state<ZoneConfig[]>([]);
 let displayOrderOverrides = $state<Record<string, number>>({}); // id -> displayOrder
+let builtInOverrides = $state<Record<string, { label?: string; color?: string }>>({}); // id -> overrides
+let zoneHeights = $state<Record<string, number>>({}); // id -> height in pixels
+let expandedZones = $state<Set<string>>(new Set()); // zones that are fully expanded (no scroll)
+
+const DEFAULT_ZONE_HEIGHT = 200;
+const MIN_ZONE_HEIGHT = 80;
 
 // ============================================================================
 // Derived
@@ -63,11 +69,16 @@ let displayOrderOverrides = $state<Record<string, number>>({}); // id -> display
 
 const allZones = $derived.by(() => {
   const zones = [...BUILT_IN_ZONES, ...customZones];
-  // Apply display order overrides
-  return zones.map((z) => ({
-    ...z,
-    displayOrder: displayOrderOverrides[z.id] ?? z.displayOrder,
-  }));
+  // Apply overrides (display order, label, color for built-in zones)
+  return zones.map((z) => {
+    const overrides = builtInOverrides[z.id];
+    return {
+      ...z,
+      displayOrder: displayOrderOverrides[z.id] ?? z.displayOrder,
+      label: overrides?.label ?? z.label,
+      color: overrides?.color ?? z.color,
+    };
+  });
 });
 
 // Zones sorted by display order (for UI rendering)
@@ -118,12 +129,24 @@ function updateZone(
   id: string,
   updates: Partial<Omit<ZoneConfig, "id" | "isBuiltIn">>
 ): void {
-  // Check if it's a built-in zone - only allow updating displayOrder
+  // Check if it's a built-in zone
   const builtIn = BUILT_IN_ZONES.find((z) => z.id === id);
   if (builtIn) {
+    // Handle displayOrder
     if (updates.displayOrder !== undefined) {
       displayOrderOverrides[id] = updates.displayOrder;
       displayOrderOverrides = { ...displayOrderOverrides };
+    }
+
+    // Handle label and color overrides for built-in zones
+    if (updates.label !== undefined || updates.color !== undefined) {
+      const existing = builtInOverrides[id] ?? {};
+      builtInOverrides[id] = {
+        ...existing,
+        ...(updates.label !== undefined && { label: updates.label }),
+        ...(updates.color !== undefined && { color: updates.color }),
+      };
+      builtInOverrides = { ...builtInOverrides };
     }
     saveToLocalStorage();
     return;
@@ -165,6 +188,65 @@ function reorderZonesDisplay(zoneIds: string[]): void {
   saveToLocalStorage();
 }
 
+function resetBuiltInZone(id: string): void {
+  const builtIn = BUILT_IN_ZONES.find((z) => z.id === id);
+  if (!builtIn) return;
+
+  // Remove overrides for this zone
+  delete builtInOverrides[id];
+  builtInOverrides = { ...builtInOverrides };
+  delete displayOrderOverrides[id];
+  displayOrderOverrides = { ...displayOrderOverrides };
+  saveToLocalStorage();
+}
+
+function getOriginalBuiltIn(id: string): ZoneConfig | undefined {
+  return BUILT_IN_ZONES.find((z) => z.id === id);
+}
+
+function getZoneHeight(id: string): number {
+  return zoneHeights[id] ?? DEFAULT_ZONE_HEIGHT;
+}
+
+function setZoneHeight(id: string, height: number): void {
+  // No upper limit - let content determine max
+  zoneHeights[id] = Math.max(MIN_ZONE_HEIGHT, height);
+  zoneHeights = { ...zoneHeights };
+  saveToLocalStorage();
+}
+
+function resetZoneHeight(id: string): void {
+  delete zoneHeights[id];
+  zoneHeights = { ...zoneHeights };
+  saveToLocalStorage();
+}
+
+function isZoneExpanded(id: string): boolean {
+  return expandedZones.has(id);
+}
+
+function toggleZoneExpanded(id: string): void {
+  const newSet = new Set(expandedZones);
+  if (newSet.has(id)) {
+    newSet.delete(id);
+  } else {
+    newSet.add(id);
+  }
+  expandedZones = newSet;
+  saveToLocalStorage();
+}
+
+function setZoneExpanded(id: string, expanded: boolean): void {
+  const newSet = new Set(expandedZones);
+  if (expanded) {
+    newSet.add(id);
+  } else {
+    newSet.delete(id);
+  }
+  expandedZones = newSet;
+  saveToLocalStorage();
+}
+
 function setZoneContextOrder(id: string, contextOrder: number): void {
   // Can't change context order of primacy (always 0) or recency (always last)
   if (id === "primacy" || id === "recency") return;
@@ -193,7 +275,13 @@ function saveToLocalStorage(): void {
   if (typeof localStorage === "undefined") return;
   localStorage.setItem(
     "aperture-custom-zones",
-    JSON.stringify({ customZones, displayOrderOverrides })
+    JSON.stringify({
+      customZones,
+      displayOrderOverrides,
+      builtInOverrides,
+      zoneHeights,
+      expandedZones: Array.from(expandedZones),
+    })
   );
 }
 
@@ -205,6 +293,9 @@ function loadFromLocalStorage(): void {
       const data = JSON.parse(stored);
       customZones = data.customZones ?? [];
       displayOrderOverrides = data.displayOrderOverrides ?? {};
+      builtInOverrides = data.builtInOverrides ?? {};
+      zoneHeights = data.zoneHeights ?? {};
+      expandedZones = new Set(data.expandedZones ?? []);
     }
   } catch (e) {
     console.error("Failed to load custom zones:", e);
@@ -249,4 +340,14 @@ export const zonesStore = {
   getZoneColor,
   reorderZonesDisplay,
   setZoneContextOrder,
+  resetBuiltInZone,
+  getOriginalBuiltIn,
+  getZoneHeight,
+  setZoneHeight,
+  resetZoneHeight,
+  isZoneExpanded,
+  toggleZoneExpanded,
+  setZoneExpanded,
+  minZoneHeight: MIN_ZONE_HEIGHT,
+  defaultZoneHeight: DEFAULT_ZONE_HEIGHT,
 };

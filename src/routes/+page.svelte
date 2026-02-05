@@ -4,6 +4,16 @@
   import { contextStore, selectionStore, uiStore, themeStore, blockTypesStore, zonesStore } from "$lib/stores";
   import type { Zone as ZoneType, Block } from "$lib/types";
 
+  // Sidebar resize state
+  let isResizingSidebar = $state(false);
+  let resizeStartX = $state(0);
+  let resizeStartWidth = $state(0);
+
+  // Zone resize state
+  let resizingZoneId = $state<string | null>(null);
+  let zoneResizeStartY = $state(0);
+  let zoneResizeStartHeight = $state(0);
+
   // Initialize stores on mount
   onMount(() => {
     // Initialize theme store (loads from localStorage)
@@ -11,6 +21,9 @@
 
     // Initialize density from localStorage
     uiStore.initDensity();
+
+    // Initialize sidebar width
+    uiStore.initSidebarWidth();
 
     // Initialize custom block types
     blockTypesStore.init();
@@ -21,6 +34,55 @@
     // Load demo data
     contextStore.loadDemoData();
   });
+
+  // Sidebar resize handlers
+  function handleResizeStart(e: MouseEvent) {
+    isResizingSidebar = true;
+    resizeStartX = e.clientX;
+    resizeStartWidth = uiStore.sidebarWidth;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  }
+
+  function handleResizeMove(e: MouseEvent) {
+    if (!isResizingSidebar) return;
+    const delta = e.clientX - resizeStartX;
+    uiStore.setSidebarWidth(resizeStartWidth + delta);
+  }
+
+  function handleResizeEnd() {
+    if (!isResizingSidebar) return;
+    isResizingSidebar = false;
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+  }
+
+  // Zone resize handlers
+  function handleZoneResizeStart(e: MouseEvent, zoneId: string) {
+    e.preventDefault();
+    e.stopPropagation();
+    resizingZoneId = zoneId;
+    zoneResizeStartY = e.clientY;
+    zoneResizeStartHeight = zonesStore.getZoneHeight(zoneId);
+    document.body.style.cursor = 'row-resize';
+    document.body.style.userSelect = 'none';
+    // Prevent any text selection
+    window.getSelection()?.removeAllRanges();
+  }
+
+  function handleZoneResizeMove(e: MouseEvent) {
+    if (!resizingZoneId) return;
+    e.preventDefault();
+    const delta = e.clientY - zoneResizeStartY;
+    zonesStore.setZoneHeight(resizingZoneId, zoneResizeStartHeight + delta);
+  }
+
+  function handleZoneResizeEnd() {
+    if (!resizingZoneId) return;
+    resizingZoneId = null;
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+  }
 
   // Keyboard shortcuts
   function handleKeydown(e: KeyboardEvent) {
@@ -207,7 +269,11 @@
   }
 </script>
 
-<svelte:window on:keydown={handleKeydown} />
+<svelte:window
+  on:keydown={handleKeydown}
+  on:mousemove={(e) => { handleResizeMove(e); handleZoneResizeMove(e); }}
+  on:mouseup={() => { handleResizeEnd(); handleZoneResizeEnd(); }}
+/>
 
 <div class="app">
   <!-- Custom Title Bar (replaces OS title bar) -->
@@ -231,7 +297,7 @@
   <!-- Main -->
   <main class="main">
     <!-- Sidebar -->
-    <aside class="sidebar">
+    <aside class="sidebar" style:width="{uiStore.sidebarWidth}px">
       <section class="sidebar-section">
         <h3 class="sidebar-heading">Snapshots</h3>
         {#if contextStore.snapshots.length === 0}
@@ -289,6 +355,14 @@
       </section>
     </aside>
 
+    <!-- Sidebar Resize Handle -->
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div
+      class="sidebar-resize-handle"
+      class:active={isResizingSidebar}
+      onmousedown={handleResizeStart}
+    ></div>
+
     <!-- Content -->
     <div class="content">
       <!-- Toolbar -->
@@ -317,7 +391,7 @@
       </div>
 
       <!-- Zones -->
-      <div class="zones">
+      <div class="zones" class:resizing={resizingZoneId !== null}>
         {#each zonesStore.zonesByDisplayOrder as zoneConfig (zoneConfig.id)}
           <Zone
             zone={zoneConfig.id as ZoneType}
@@ -325,7 +399,11 @@
             collapsed={uiStore.isZoneCollapsed(zoneConfig.id)}
             selectedIds={selectionStore.selectedIds}
             draggingBlockIds={uiStore.draggingBlockIds}
+            height={zonesStore.getZoneHeight(zoneConfig.id)}
+            expanded={zonesStore.isZoneExpanded(zoneConfig.id)}
+            isResizing={resizingZoneId === zoneConfig.id}
             onToggleCollapse={() => handleToggleZoneCollapse(zoneConfig.id as ZoneType)}
+            onToggleExpanded={() => zonesStore.toggleZoneExpanded(zoneConfig.id)}
             onBlockSelect={handleBlockSelect}
             onBlockDoubleClick={handleBlockDoubleClick}
             onBlockDragStart={handleBlockDragStart}
@@ -333,6 +411,7 @@
             onDrop={handleZoneDrop}
             onCreateBlock={handleCreateBlock}
             onReorder={handleZoneReorder}
+            onResizeStart={(e) => handleZoneResizeStart(e, zoneConfig.id)}
             --zone-color={zoneConfig.color}
           />
         {/each}
@@ -469,13 +548,27 @@
 
   /* Sidebar */
   .sidebar {
-    width: 200px;
     background: var(--bg-surface);
     border-right: 1px solid var(--border-subtle);
     display: flex;
     flex-direction: column;
     flex-shrink: 0;
     overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  /* Sidebar Resize Handle */
+  .sidebar-resize-handle {
+    width: 4px;
+    cursor: col-resize;
+    background: transparent;
+    transition: background 0.15s ease;
+    flex-shrink: 0;
+  }
+
+  .sidebar-resize-handle:hover,
+  .sidebar-resize-handle.active {
+    background: var(--accent);
   }
 
   .sidebar-section {
@@ -620,9 +713,34 @@
   .zones {
     flex: 1;
     overflow-y: auto;
+    overflow-x: hidden;
     padding: var(--space-md);
     display: flex;
     flex-direction: column;
     gap: var(--space-sm);
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-default) transparent;
+  }
+
+  .zones::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .zones::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .zones::-webkit-scrollbar-thumb {
+    background: var(--border-default);
+    border-radius: 4px;
+  }
+
+  .zones::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted);
+  }
+
+  .zones.resizing {
+    user-select: none;
+    cursor: row-resize;
   }
 </style>

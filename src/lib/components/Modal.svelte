@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Block, Role } from "$lib/types";
-  import { blockTypesStore } from "$lib/stores";
+  import { blockTypesStore, zonesStore } from "$lib/stores";
 
   interface Props {
     block: Block | null;
@@ -25,6 +25,14 @@
   }: Props = $props();
 
   let roleDropdownOpen = $state(false);
+  let zoneDropdownOpen = $state(false);
+
+  // Get zone label for display
+  const zoneLabel = $derived.by(() => {
+    if (!block) return '';
+    const zone = zonesStore.getZoneById(block.zone);
+    return zone?.label ?? block.zone;
+  });
 
   // Get display info for current block
   const displayTypeId = $derived(block?.blockType ?? block?.role ?? "user");
@@ -116,7 +124,7 @@
         </div>
         <div class="meta-item">
           <span class="meta-label">Zone</span>
-          <span class="meta-value">{block.zone}</span>
+          <span class="meta-value">{zoneLabel}</span>
         </div>
         <div class="meta-item">
           <span class="meta-label">Compression</span>
@@ -135,10 +143,29 @@
       <div class="modal-actions">
         <div class="action-group">
           <span class="action-label">Zone</span>
-          <div class="action-buttons">
-            <button class:active={block.zone === "primacy"} onclick={() => onMove?.("primacy")}>Primacy</button>
-            <button class:active={block.zone === "middle"} onclick={() => onMove?.("middle")}>Middle</button>
-            <button class:active={block.zone === "recency"} onclick={() => onMove?.("recency")}>Recency</button>
+          <div class="zone-dropdown-container">
+            <button
+              class="zone-dropdown-trigger"
+              onclick={() => zoneDropdownOpen = !zoneDropdownOpen}
+            >
+              <span class="zone-dot-small" style:background={zonesStore.getZoneColor(block.zone)}></span>
+              {zoneLabel}
+              <span class="dropdown-arrow">▼</span>
+            </button>
+            {#if zoneDropdownOpen}
+              <div class="zone-dropdown">
+                {#each zonesStore.zonesByDisplayOrder as zone (zone.id)}
+                  <button
+                    class="zone-dropdown-item"
+                    class:active={block.zone === zone.id}
+                    onclick={() => { onMove?.(zone.id as Block["zone"]); zoneDropdownOpen = false; }}
+                  >
+                    <span class="zone-dot-small" style:background={zone.color}></span>
+                    {zone.label}
+                  </button>
+                {/each}
+              </div>
+            {/if}
           </div>
         </div>
 
@@ -305,6 +332,80 @@
     height: 6px;
     border-radius: 1px;
     flex-shrink: 0;
+  }
+
+  /* Zone dropdown */
+  .zone-dropdown-container {
+    position: relative;
+  }
+
+  .zone-dropdown-trigger {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    border-radius: 3px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.1s ease;
+  }
+
+  .zone-dropdown-trigger:hover {
+    background: var(--bg-hover);
+    border-color: var(--border-strong);
+    color: var(--text-primary);
+  }
+
+  .zone-dot-small {
+    width: 6px;
+    height: 6px;
+    border-radius: 1px;
+    flex-shrink: 0;
+  }
+
+  .zone-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    margin-top: 4px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-default);
+    border-radius: 4px;
+    box-shadow: var(--shadow-md);
+    z-index: 100;
+    min-width: 120px;
+    overflow: hidden;
+  }
+
+  .zone-dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 6px 10px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    text-align: left;
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: background 0.1s ease;
+  }
+
+  .zone-dropdown-item:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+  }
+
+  .zone-dropdown-item.active {
+    background: var(--accent-subtle);
+    color: var(--text-primary);
+    font-weight: 600;
   }
 
   .tool-name {

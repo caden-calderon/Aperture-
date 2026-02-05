@@ -101,6 +101,12 @@ const USER_MESSAGES = [
   "The blocks should be draggable. When I drag a block to a different zone, it should move there. Add visual feedback during drag.",
   "Can you add selection? Click to select one block, shift+click for range select, and show a teal border on selected blocks.",
   "Now implement the compression slider. When I drag the slider, blocks should visually dissolve based on their compression level.",
+  "We need a token budget bar at the top. Show usage by zone with a gradient that changes color as we approach the limit.",
+  "Add a command palette like VS Code. Cmd+K should open it with all available actions.",
+  "The sidebar needs sections for snapshots, block types, and keyboard shortcuts. Make it collapsible.",
+  "Implement multi-select drag. When I have multiple blocks selected, dragging one should move all of them.",
+  "Add custom zones. Users should be able to create their own zones beyond primacy/middle/recency.",
+  "The theme system needs work. Add preset themes and let users customize individual colors.",
 ];
 
 const ASSISTANT_RESPONSES = [
@@ -134,6 +140,74 @@ The zone accent colors (teal/yellow/pink) will pulse on valid drop targets.`,
 - **A key**: Select all in current zone
 
 Selected blocks get intensified halftone dots to show "heat" increase.`,
+
+  `The compression slider will use a continuous range from 0-100%. Visual feedback:
+
+- **0-30%**: Full opacity, all content visible
+- **30-60%**: Slight blur, dots start to scatter
+- **60-90%**: Heavy dithering, text barely legible
+- **90-100%**: Nearly invisible, just scattered dots remain
+
+This creates the "dissolving document" effect that defines Aperture's aesthetic.`,
+
+  `TokenBudgetBar implementation with zone segments:
+
+\`\`\`svelte
+<div class="budget-bar">
+  {#each zoneSegments as segment}
+    <div class="segment" style:width="{segment.percent}%" style:background={segment.color}></div>
+  {/each}
+</div>
+\`\`\`
+
+Colors shift from warm gold (safe) to rust red (danger) as usage increases. At 90%+, the bar pulses.`,
+
+  `CommandPalette with fuzzy search:
+
+- Opens on Cmd+K (Mac) or Ctrl+K (Windows)
+- Shows all available commands grouped by category
+- Type to filter, Enter to execute
+- Recent commands appear at top
+
+Styled with the newspaper aesthetic - no rounded corners, strong borders.`,
+
+  `Sidebar architecture with collapsible sections:
+
+1. **Snapshots**: List of saved states with restore buttons
+2. **Block Types**: Filter by system/user/assistant/tool
+3. **Display**: Density slider (75%-125%)
+4. **Theme**: Preset selector and customization
+5. **Shortcuts**: Quick reference card
+
+Each section persists its collapsed state to localStorage.`,
+
+  `Multi-drag implementation:
+
+When dragging with selection, I show a badge "+N" indicating how many blocks are moving. All selected blocks animate together with staggered delays for a cascading effect.
+
+The drop zone shows "Drop 4 blocks to Recency" for clarity.`,
+
+  `Custom zones stored in zonesStore:
+
+\`\`\`typescript
+interface ZoneConfig {
+  id: string;
+  label: string;
+  color: string;
+  isBuiltIn: boolean;
+  contextOrder: number;  // Position in LLM context
+  displayOrder: number;  // Visual position in UI
+}
+\`\`\`
+
+Primacy always first, Recency always last in context order.`,
+
+  `Theme system with 13 built-in presets:
+
+**Dark themes**: Charcoal, Tokyo Night, Gruvbox, Catppuccin, Nord, Dracula, One Dark, Solarized
+**Light themes**: Warm, Gruvbox Light, Tokyo Light, Sepia, Solarized Light
+
+Users can customize any of 18 color properties. Custom themes persist to localStorage.`,
 ];
 
 const TOOL_RESULTS = [
@@ -167,6 +241,62 @@ export interface Block {
 - Added collapse toggle
 - Added token count display
 - Styled with zone accent color`,
+  },
+  {
+    name: "Read",
+    content: `src/lib/stores/context.svelte.ts (245 lines)
+\`\`\`typescript
+let blocks = $state<Block[]>([]);
+let snapshots = $state<Snapshot[]>([]);
+
+const blocksByZone = $derived.by(() => {
+  const grouped: Record<string, Block[]> = {};
+  for (const block of blocks) {
+    if (!grouped[block.zone]) grouped[block.zone] = [];
+    grouped[block.zone].push(block);
+  }
+  return grouped;
+});
+\`\`\``,
+  },
+  {
+    name: "Grep",
+    content: `Found 23 matches for "useState" in 8 files:
+Note: Using Svelte 5 runes instead ($state, $derived)
+- src/lib/stores/*.svelte.ts: 18 occurrences
+- src/lib/components/*.svelte: 5 occurrences`,
+  },
+  {
+    name: "Write",
+    content: `Created src/lib/components/CommandPalette.svelte
+- 156 lines
+- Implements fuzzy search with fuse.js
+- Keyboard navigation (up/down/enter/escape)`,
+  },
+  {
+    name: "Bash",
+    content: `$ npm run check
+svelte-check found 0 errors and 0 warnings
+
+$ cargo clippy
+Finished dev profile [unoptimized + debuginfo] target(s) in 0.21s`,
+  },
+  {
+    name: "Read",
+    content: `src/app.css (312 lines)
+CSS Variables defined:
+--bg-base, --bg-surface, --bg-elevated, --bg-hover
+--text-primary, --text-secondary, --text-muted
+--accent, --zone-primacy, --zone-middle, --zone-recency
+--font-mono: 'JetBrains Mono'
+--font-display: 'IBM Plex Mono'`,
+  },
+  {
+    name: "Edit",
+    content: `Updated src/lib/stores/theme.svelte.ts
+- Added 13 built-in presets
+- Implemented color customization
+- localStorage persistence`,
   },
 ];
 

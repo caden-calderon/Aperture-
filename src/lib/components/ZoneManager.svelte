@@ -140,7 +140,17 @@
   function handleEdit(zone: typeof zonesStore.allZones[0]) {
     editingZone = zone;
     newLabel = zone.label;
-    newColor = zone.color.startsWith('var(') ? '#6b8e23' : zone.color;
+    // For built-in zones, try to get the current effective color
+    // If it's a CSS variable, use a sensible default based on zone
+    if (zone.color.startsWith('var(')) {
+      // Get computed value if possible, or use defaults
+      if (zone.id === 'primacy') newColor = '#4a9d9a';
+      else if (zone.id === 'middle') newColor = '#b8a04a';
+      else if (zone.id === 'recency') newColor = '#a85d5d';
+      else newColor = '#6b8e23';
+    } else {
+      newColor = zone.color;
+    }
   }
 
   function handleSaveEdit() {
@@ -181,6 +191,15 @@
     showAddDialog = false;
     editingZone = null;
     resetForm();
+  }
+
+  function handleResetBuiltIn() {
+    if (editingZone?.isBuiltIn) {
+      zonesStore.resetBuiltInZone(editingZone.id);
+      uiStore.showToast(`Reset ${editingZone.label} to defaults`, 'success');
+      editingZone = null;
+      resetForm();
+    }
   }
 </script>
 
@@ -234,16 +253,16 @@
                   <span class="zone-tokens">{formatNumber(getTokenCount(zone.id))}</span>
                 </span>
               </button>
-              {#if !zone.isBuiltIn}
-                <div class="zone-actions">
-                  <button class="zone-action-btn" onclick={() => handleEdit(zone)} title="Edit">
-                    <span>...</span>
-                  </button>
+              <div class="zone-actions">
+                <button class="zone-action-btn" onclick={() => handleEdit(zone)} title="Edit">
+                  <span>...</span>
+                </button>
+                {#if !zone.isBuiltIn}
                   <button class="zone-action-btn zone-action-delete" onclick={() => handleDeleteClick(zone.id)} title="Delete">
                     <span>×</span>
                   </button>
-                </div>
-              {/if}
+                {/if}
+              </div>
             </div>
           {/if}
         {/each}
@@ -257,7 +276,14 @@
       <!-- Add/Edit Dialog -->
       {#if showAddDialog || editingZone}
         <div class="dialog">
-          <div class="dialog-title">{editingZone ? 'Edit Zone' : 'New Zone'}</div>
+          <div class="dialog-header">
+            <div class="dialog-title">{editingZone ? 'Edit Zone' : 'New Zone'}</div>
+            {#if editingZone?.isBuiltIn}
+              <button class="dialog-reset-btn" onclick={handleResetBuiltIn} title="Reset to defaults">
+                Reset
+              </button>
+            {/if}
+          </div>
           <div class="dialog-field">
             <label for="zone-label">Label</label>
             <input
@@ -275,8 +301,13 @@
                 type="color"
                 bind:value={newColor}
               />
-              <span class="color-preview" style:background={newColor}></span>
-              <span class="color-value">{newColor}</span>
+              <button
+                class="color-hex-btn"
+                onclick={() => { navigator.clipboard.writeText(newColor); uiStore.showToast('Copied ' + newColor, 'info'); }}
+                title="Click to copy"
+              >
+                {newColor}
+              </button>
             </div>
           </div>
           <div class="dialog-actions">
@@ -555,11 +586,34 @@
     border-radius: 6px;
   }
 
+  .dialog-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+
   .dialog-title {
     font-size: 10px;
     font-weight: 600;
     color: var(--text-primary);
-    margin-bottom: 10px;
+  }
+
+  .dialog-reset-btn {
+    font-size: 9px;
+    font-family: var(--font-mono);
+    padding: 2px 6px;
+    background: transparent;
+    border: 1px solid var(--border-default);
+    border-radius: 3px;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.1s ease;
+  }
+
+  .dialog-reset-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
   }
 
   .dialog-field {
@@ -600,17 +654,21 @@
     background: transparent;
   }
 
-  .color-preview {
-    width: 20px;
-    height: 20px;
-    border-radius: 3px;
-    border: 1px solid var(--border-subtle);
-  }
-
-  .color-value {
+  .color-hex-btn {
     font-family: var(--font-mono);
     font-size: 9px;
     color: var(--text-muted);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 2px 4px;
+    border-radius: 2px;
+    transition: all 0.1s ease;
+  }
+
+  .color-hex-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
   }
 
   .dialog-actions {

@@ -9,7 +9,11 @@
     collapsed?: boolean;
     selectedIds?: Set<string>;
     draggingBlockIds?: string[];
+    height?: number;
+    expanded?: boolean;
+    isResizing?: boolean;
     onToggleCollapse?: () => void;
+    onToggleExpanded?: () => void;
     onBlockSelect?: (id: string, event: { shiftKey: boolean; ctrlKey: boolean; metaKey: boolean }) => void;
     onBlockDoubleClick?: (id: string) => void;
     onBlockDragStart?: (ids: string[]) => void;
@@ -17,6 +21,7 @@
     onDrop?: (zone: ZoneType, blockIds: string[]) => void;
     onCreateBlock?: (zone: ZoneType, typeId: string) => void;
     onReorder?: (zone: ZoneType, blockIds: string[], insertIndex: number) => void;
+    onResizeStart?: (e: MouseEvent) => void;
   }
 
   let {
@@ -25,7 +30,11 @@
     collapsed = false,
     selectedIds = new Set<string>(),
     draggingBlockIds = [],
+    height,
+    expanded = false,
+    isResizing = false,
     onToggleCollapse,
+    onToggleExpanded,
     onBlockSelect,
     onBlockDoubleClick,
     onBlockDragStart,
@@ -33,6 +42,7 @@
     onDrop,
     onCreateBlock,
     onReorder,
+    onResizeStart,
   }: Props = $props();
 
   let isDragOver = $state(false);
@@ -190,6 +200,8 @@
 <section
   class="zone"
   class:collapsed
+  class:expanded
+  class:resizing={isResizing}
   class:drag-over={(isDragOver && draggingBlockIds.length > 0) || isTypeDropOver}
   style:--zone-color={config.color}
   aria-label="{config.label} zone"
@@ -198,27 +210,44 @@
   ondragleave={handleDragLeave}
   ondrop={handleDrop}
 >
-  <button
-    class="zone-header"
-    onclick={onToggleCollapse}
-    aria-expanded={!collapsed}
-    title={config.description}
-  >
-    <div class="zone-info">
-      <span class="zone-indicator"></span>
-      <span class="zone-label">{config.label}</span>
-      <span class="zone-stats">
-        {blocks.length} blocks · {formatTokens(totalTokens)} tokens
-        {#if selectedInZone.length > 0}
-          · <span class="selected-stat">{selectedInZone.length} selected</span>
-        {/if}
-      </span>
-    </div>
-    <span class="collapse-icon">{collapsed ? "+" : "−"}</span>
-  </button>
+  <div class="zone-header-row">
+    <button
+      class="zone-header"
+      onclick={onToggleCollapse}
+      aria-expanded={!collapsed}
+      title={config.description}
+    >
+      <div class="zone-info">
+        <span class="zone-indicator"></span>
+        <span class="zone-label">{config.label}</span>
+        <span class="zone-stats">
+          {blocks.length} blocks · {formatTokens(totalTokens)} tokens
+          {#if selectedInZone.length > 0}
+            · <span class="selected-stat">{selectedInZone.length} selected</span>
+          {/if}
+        </span>
+      </div>
+      <span class="collapse-icon">{collapsed ? "+" : "−"}</span>
+    </button>
+    {#if !collapsed}
+      <button
+        class="expand-toggle"
+        class:active={expanded}
+        onclick={onToggleExpanded}
+        title={expanded ? "Collapse to scrollable" : "Expand to show all"}
+      >
+        {expanded ? "⊟" : "⊞"}
+      </button>
+    {/if}
+  </div>
 
   {#if !collapsed}
-    <div class="zone-content" bind:this={zoneContentRef}>
+    <div
+      class="zone-content"
+      class:expanded
+      bind:this={zoneContentRef}
+      style:max-height={expanded ? undefined : (height ? `${height}px` : undefined)}
+    >
       {#if blocks.length === 0}
         <div class="zone-empty">Drop blocks here</div>
       {:else}
@@ -242,6 +271,15 @@
         {/if}
       {/if}
     </div>
+    <!-- Resize handle at bottom of zone -->
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div
+      class="zone-resize-handle"
+      class:active={isResizing}
+      onmousedown={(e) => { e.preventDefault(); e.stopPropagation(); onResizeStart?.(e); }}
+    >
+      <div class="resize-grip-line"></div>
+    </div>
   {/if}
 
   {#if isTypeDropOver}
@@ -263,6 +301,7 @@
     border-radius: 6px;
     transition: border-color 0.12s ease, box-shadow 0.12s ease;
     overflow: hidden;
+    flex-shrink: 0;
   }
 
   .zone::before {
@@ -275,16 +314,26 @@
     background: var(--zone-color);
   }
 
+  .zone.resizing {
+    border-color: var(--zone-color);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--zone-color) 30%, transparent);
+  }
+
   .zone.drag-over {
     border-color: var(--zone-color);
     box-shadow: 0 0 0 2px color-mix(in srgb, var(--zone-color) 20%, transparent);
+  }
+
+  .zone-header-row {
+    display: flex;
+    align-items: center;
   }
 
   .zone-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    width: 100%;
+    flex: 1;
     padding: 8px 12px 8px 14px;
     background: transparent;
     border: none;
@@ -296,6 +345,30 @@
 
   .zone-header:hover {
     background: var(--bg-hover);
+  }
+
+  .expand-toggle {
+    padding: 4px 8px;
+    margin-right: 8px;
+    font-size: 12px;
+    background: transparent;
+    border: 1px solid var(--border-subtle);
+    border-radius: 3px;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.1s ease;
+  }
+
+  .expand-toggle:hover {
+    background: var(--bg-hover);
+    border-color: var(--border-default);
+    color: var(--text-primary);
+  }
+
+  .expand-toggle.active {
+    background: var(--accent-subtle);
+    border-color: var(--accent);
+    color: var(--accent);
   }
 
   .zone-info {
@@ -349,6 +422,73 @@
     flex-direction: column;
     gap: calc(4px * var(--density-scale, 1));
     animation: zone-expand 0.15s ease-out;
+    max-height: 300px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-default) transparent;
+  }
+
+  .zone-content::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .zone-content::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .zone-content::-webkit-scrollbar-thumb {
+    background: var(--border-default);
+    border-radius: 3px;
+  }
+
+  .zone-content::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted);
+  }
+
+  .zone-content.expanded {
+    max-height: none;
+    overflow-y: visible;
+  }
+
+  /* Zone resize handle */
+  .zone-resize-handle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 16px;
+    cursor: row-resize;
+    background: var(--bg-inset);
+    border-top: 1px solid var(--border-subtle);
+    transition: all 0.1s ease;
+    user-select: none;
+    position: relative;
+  }
+
+  .zone-resize-handle:hover {
+    background: color-mix(in srgb, var(--zone-color) 15%, var(--bg-inset));
+  }
+
+  .zone-resize-handle.active {
+    background: color-mix(in srgb, var(--zone-color) 25%, var(--bg-inset));
+  }
+
+  .resize-grip-line {
+    width: 40px;
+    height: 3px;
+    background: var(--border-default);
+    border-radius: 2px;
+    transition: all 0.1s ease;
+  }
+
+  .zone-resize-handle:hover .resize-grip-line {
+    background: var(--zone-color);
+    width: 60px;
+  }
+
+  .zone-resize-handle.active .resize-grip-line {
+    background: var(--zone-color);
+    width: 80px;
+    height: 4px;
   }
 
   @keyframes zone-expand {

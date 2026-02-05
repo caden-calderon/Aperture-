@@ -524,17 +524,75 @@ make test-ui     # Frontend tests
 
 ---
 
-### Next Session: UI Polish & Bug Fixes
+### 2026-02-04: UI Polish Session
 
-**Bugs to Fix:**
-- [ ] Creating new zone incorrectly creates a block type (adds to Block Types)
-- [ ] Sidebar has horizontal scroll - should be resizable instead
+**Completed:**
+- [x] **Resizable sidebar** — Drag handle on right edge, width 180-400px, persists to localStorage
+- [x] **Zone scrolling** — Each zone content scrolls when blocks overflow (max-height 300px)
+- [x] **Main scroll** — Already working via `.zones` container
+- [x] **Edit built-in zones** — Can now rename and recolor Primacy/Middle/Recency
+  - Store: `builtInOverrides` for label/color changes
+  - Reset button to restore defaults
+  - Edit button now visible for all zones
+- [x] **Zone/block type bug** — Investigated, stores are separate (different localStorage keys)
 
-**Features to Add:**
-- [ ] **Edit built-in zone colors/names** - Allow renaming "Recency" to "Recent", changing colors
-- [ ] **Zone scrolling** - Scroll within zones when content overflows
-- [ ] **Main scroll** - Scroll through all zones (expand all zones and scroll through them)
-- [ ] **Dynamic zone resizing** - Resize individual zones (drag handles)
-- [ ] **Resizable sidebar** - Drag to resize sidebar width (with max cap to not eat main area)
+**Files Updated:**
+- `src/lib/stores/ui.svelte.ts` — Added sidebarWidth state and actions
+- `src/lib/stores/zones.svelte.ts` — Added builtInOverrides, resetBuiltInZone()
+- `src/lib/components/Zone.svelte` — Added zone content scrolling
+- `src/lib/components/ZoneManager.svelte` — Edit button for built-in zones, reset button
+- `src/routes/+page.svelte` — Resizable sidebar with drag handle
 
-**Phase 0 status: ONGOING**
+---
+
+### 2026-02-04: Modal & Zone Fixes + Dynamic Resizing
+
+**Completed:**
+- [x] **Modal zone display** — Shows zone label instead of ID (zone-xxx)
+- [x] **Zone dropdown in modal** — Dropdown selector for all zones (like block types)
+- [x] **ZoneManager color picker** — Single color picker + clickable hex to copy
+- [x] **Dynamic zone resizing** — Drag handles between zones, 80-600px range, persists
+
+**Files Updated:**
+- `src/lib/components/Modal.svelte` — Zone dropdown, zone label display
+- `src/lib/components/ZoneManager.svelte` — Simplified color picker with copy
+- `src/lib/stores/zones.svelte.ts` — Zone height state and persistence
+- `src/lib/components/Zone.svelte` — Height prop for content area
+- `src/routes/+page.svelte` — Zone resize handles between zones
+
+---
+
+### 2026-02-04: Zone Resizing Redesign + More Demo Data
+
+**Completed:**
+- [x] **Zone resize at bottom** — Each zone has its own resize handle at the bottom
+- [x] **No max height limit** — Zones can expand as tall as needed
+- [x] **Expand toggle button** — ⊞/⊟ in header to fully expand (removes scroll)
+- [x] **Expanded state persistence** — Stored in localStorage
+- [x] **Better resize UX** — Visual grip indicator, prevents text selection
+- [x] **More demo blocks** — 10 user messages, 10 assistant responses, 10 tool results
+- [x] **Modal zone dropdown** — Fixed to show zone labels not IDs
+
+**Files Updated:**
+- `src/lib/stores/zones.svelte.ts` — Expanded state, no max height
+- `src/lib/components/Zone.svelte` — Resize handle at bottom, expand toggle
+- `src/lib/mock-data.ts` — Much more demo content
+- `src/routes/+page.svelte` — Updated zone rendering
+
+---
+
+### Next Session: Fix Zone Resize & Polish
+
+**Known Bugs to Fix:**
+- [ ] **Primacy/Recency zones don't resize** — Middle and custom zones resize fine, but primacy/recency don't respond to drag
+- [ ] **Primacy/Recency always expanded** — No inner scroll, they just grow with content. Middle/custom zones work correctly with inner scroll
+- [ ] Likely same root cause — something specific to built-in primacy/recency zones
+
+**Still TODO:**
+- [ ] Fix zone height/expand state logic
+- [ ] Test all features in `npm run tauri dev`
+- [ ] Horizontal zone resize (for future right sidebar)
+- [ ] Verify all localStorage persistence works correctly
+- [ ] Performance check with many blocks
+
+**Phase 0 status: ~90% COMPLETE** — Core UI done, fixing edge cases

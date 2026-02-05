@@ -22,12 +22,13 @@ export interface Toast {
 
 let modalBlockId = $state<string | null>(null);
 let commandPaletteOpen = $state(false);
-let draggingBlockId = $state<string | null>(null);
+let draggingBlockIds = $state<string[]>([]);
 let dragOverZone = $state<string | null>(null);
 let toasts = $state<Toast[]>([]);
 let collapsedZones = $state(new Set<string>());
 let compressionSliderOpen = $state(false);
 let sidebarCollapsed = $state(false);
+let sidebarWidth = $state(220); // Default width in pixels
 
 // Density: 0.8 = compact, 1.0 = normal, 1.2 = comfortable
 let density = $state(1.0);
@@ -37,7 +38,7 @@ let density = $state(1.0);
 // ============================================================================
 
 const hasModal = $derived(modalBlockId !== null);
-const isDragging = $derived(draggingBlockId !== null);
+const isDragging = $derived(draggingBlockIds.length > 0);
 
 // ============================================================================
 // Modal Actions
@@ -71,8 +72,8 @@ function toggleCommandPalette(): void {
 // Drag State Actions
 // ============================================================================
 
-function startDrag(blockId: string): void {
-  draggingBlockId = blockId;
+function startDrag(blockIds: string[]): void {
+  draggingBlockIds = blockIds;
 }
 
 function setDragOverZone(zone: string | null): void {
@@ -80,7 +81,7 @@ function setDragOverZone(zone: string | null): void {
 }
 
 function endDrag(): void {
-  draggingBlockId = null;
+  draggingBlockIds = [];
   dragOverZone = null;
 }
 
@@ -152,6 +153,29 @@ function toggleSidebar(): void {
 }
 
 // ============================================================================
+// Sidebar Width Actions
+// ============================================================================
+
+const MIN_SIDEBAR_WIDTH = 180;
+const MAX_SIDEBAR_WIDTH = 400;
+const DEFAULT_SIDEBAR_WIDTH = 220;
+
+function setSidebarWidth(width: number): void {
+  sidebarWidth = Math.max(MIN_SIDEBAR_WIDTH, Math.min(MAX_SIDEBAR_WIDTH, width));
+  localStorage.setItem('aperture-sidebar-width', sidebarWidth.toString());
+}
+
+function initSidebarWidth(): void {
+  const stored = localStorage.getItem('aperture-sidebar-width');
+  if (stored) {
+    const value = parseInt(stored, 10);
+    if (!isNaN(value)) {
+      setSidebarWidth(value);
+    }
+  }
+}
+
+// ============================================================================
 // Density Actions
 // ============================================================================
 
@@ -199,8 +223,8 @@ export const uiStore = {
   get commandPaletteOpen() {
     return commandPaletteOpen;
   },
-  get draggingBlockId() {
-    return draggingBlockId;
+  get draggingBlockIds() {
+    return draggingBlockIds;
   },
   get dragOverZone() {
     return dragOverZone;
@@ -219,6 +243,15 @@ export const uiStore = {
   },
   get sidebarCollapsed() {
     return sidebarCollapsed;
+  },
+  get sidebarWidth() {
+    return sidebarWidth;
+  },
+  get minSidebarWidth() {
+    return MIN_SIDEBAR_WIDTH;
+  },
+  get maxSidebarWidth() {
+    return MAX_SIDEBAR_WIDTH;
   },
   get density() {
     return density;
@@ -252,6 +285,8 @@ export const uiStore = {
 
   // Sidebar
   toggleSidebar,
+  setSidebarWidth,
+  initSidebarWidth,
 
   // Density
   setDensity,
