@@ -29,6 +29,23 @@
   // Per-block collapsed state (local, not persisted)
   let isCollapsed = $state(false);
 
+  // Track whether content overflows its max-height (to show/hide fade gradient)
+  let preRef = $state<HTMLElement | null>(null);
+  let isOverflowing = $state(false);
+
+  $effect(() => {
+    // Re-check when content or expand state changes
+    const _content = block.content;
+    const _fullContent = showFullContent;
+    const _collapsed = isCollapsed;
+    if (preRef && !_collapsed && !_fullContent) {
+      // $effect runs after DOM update, so measurements are accurate
+      isOverflowing = preRef.scrollHeight > preRef.clientHeight + 2;
+    } else {
+      isOverflowing = false;
+    }
+  });
+
   // Count how many blocks are being dragged
   const dragCount = $derived(selected && selectedIds.size > 1 ? selectedIds.size : 1);
 
@@ -62,6 +79,31 @@
     if (e.dataTransfer) {
       e.dataTransfer.effectAllowed = "move";
       e.dataTransfer.setData("text/plain", JSON.stringify(idsToMove));
+
+      // Create compact drag ghost instead of using full block element
+      const ghost = document.createElement('div');
+      const count = idsToMove.length;
+      ghost.textContent = count > 1 ? `${count} blocks` : displayLabel;
+      ghost.style.cssText = `
+        padding: 4px 10px;
+        background: var(--bg-elevated, #2a2a2a);
+        color: var(--text-primary, #fff);
+        font-family: var(--font-mono, monospace);
+        font-size: 11px;
+        font-weight: 600;
+        border: 1px solid var(--border-default, #444);
+        border-left: 3px solid ${displayColor};
+        border-radius: 4px;
+        white-space: nowrap;
+        position: fixed;
+        top: -100px;
+        left: -100px;
+        z-index: 9999;
+      `;
+      document.body.appendChild(ghost);
+      e.dataTransfer.setDragImage(ghost, 0, 0);
+      // Clean up after browser captures the ghost
+      requestAnimationFrame(() => document.body.removeChild(ghost));
     }
     onDragStart?.(idsToMove);
   }
@@ -129,8 +171,8 @@
   </div>
 
   {#if showContent}
-    <div class="block-content" class:content-expanded={showFullContent}>
-      <pre>{showFullContent ? block.content : getPreview(block.content)}</pre>
+    <div class="block-content" class:content-expanded={showFullContent} class:has-overflow={isOverflowing}>
+      <pre bind:this={preRef}>{showFullContent ? block.content : getPreview(block.content)}</pre>
     </div>
   {/if}
 
@@ -189,9 +231,8 @@
   }
 
   .block.dragging {
-    opacity: 0.5;
-    transform: scale(1.005);
-    box-shadow: var(--shadow-md);
+    opacity: 0.4;
+    box-shadow: none;
   }
 
   .block.pinned::after {
@@ -309,7 +350,7 @@
     display: none;
   }
 
-  /* Fade out at bottom of truncated content */
+  /* Fade out at bottom — only when content actually overflows */
   .block-content::after {
     content: "";
     position: absolute;
@@ -319,13 +360,18 @@
     height: 20px;
     background: linear-gradient(transparent, var(--bg-elevated));
     pointer-events: none;
+    display: none;
   }
 
-  .block.selected .block-content::after {
+  .block-content.has-overflow::after {
+    display: block;
+  }
+
+  .block.selected .block-content.has-overflow::after {
     background: linear-gradient(transparent, var(--accent-subtle));
   }
 
-  .block:hover .block-content::after {
+  .block:hover .block-content.has-overflow::after {
     background: linear-gradient(transparent, var(--bg-hover));
   }
 

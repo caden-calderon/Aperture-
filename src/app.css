@@ -164,6 +164,14 @@ body {
   transition: background-color 0.2s ease, color 0.2s ease;
 }
 
+/* Global resize lock — prevents text selection and pointer flicker during sidebar/zone resize */
+html.is-resizing,
+html.is-resizing * {
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  cursor: col-resize !important;
+}
+
 /* ============================================================================
    Typography
    ============================================================================ */

@@ -8,6 +8,8 @@
   let isResizingSidebar = $state(false);
   let resizeStartX = $state(0);
   let resizeStartWidth = $state(0);
+  let sidebarResizeRaf = $state<number | null>(null);
+  let sidebarRef = $state<HTMLElement | null>(null);
 
   // Zone resize state
   let resizingZoneId = $state<string | null>(null);
@@ -35,26 +37,40 @@
     contextStore.init();
   });
 
-  // Sidebar resize handlers
+  // Sidebar resize handlers — uses rAF + direct DOM for smooth resize
   function handleResizeStart(e: MouseEvent) {
     isResizingSidebar = true;
     resizeStartX = e.clientX;
     resizeStartWidth = uiStore.sidebarWidth;
     document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
+    document.documentElement.classList.add('is-resizing');
   }
 
   function handleResizeMove(e: MouseEvent) {
     if (!isResizingSidebar) return;
-    const delta = e.clientX - resizeStartX;
-    uiStore.setSidebarWidth(resizeStartWidth + delta);
+    // Cancel any pending rAF to coalesce rapid mousemove events
+    if (sidebarResizeRaf) cancelAnimationFrame(sidebarResizeRaf);
+    sidebarResizeRaf = requestAnimationFrame(() => {
+      const delta = e.clientX - resizeStartX;
+      const newWidth = Math.max(180, Math.min(400, resizeStartWidth + delta));
+      // Direct DOM update during drag for smoothness — bypasses Svelte reactivity
+      if (sidebarRef) {
+        sidebarRef.style.width = `${newWidth}px`;
+      }
+    });
   }
 
   function handleResizeEnd() {
     if (!isResizingSidebar) return;
+    if (sidebarResizeRaf) cancelAnimationFrame(sidebarResizeRaf);
+    // Commit final width to store (triggers one reactive update)
+    if (sidebarRef) {
+      const finalWidth = parseInt(sidebarRef.style.width) || uiStore.sidebarWidth;
+      uiStore.setSidebarWidth(finalWidth);
+    }
     isResizingSidebar = false;
     document.body.style.cursor = '';
-    document.body.style.userSelect = '';
+    document.documentElement.classList.remove('is-resizing');
   }
 
   // Zone resize handlers
@@ -72,7 +88,18 @@
 
     resizingZoneId = zoneId;
     zoneResizeStartY = e.clientY;
-    zoneResizeStartHeight = zonesStore.getZoneHeight(zoneId);
+
+    const storedHeight = zonesStore.getZoneHeight(zoneId);
+    // Snap to actual content height if it's less than stored max-height.
+    // This prevents a "dead zone" where dragging increases max-height
+    // but nothing visual changes because content doesn't fill the zone.
+    if (measuredHeight && measuredHeight < storedHeight) {
+      zonesStore.setZoneHeight(zoneId, Math.max(measuredHeight, zonesStore.minZoneHeight));
+      zoneResizeStartHeight = Math.max(measuredHeight, zonesStore.minZoneHeight);
+    } else {
+      zoneResizeStartHeight = storedHeight;
+    }
+
     document.body.style.cursor = 'row-resize';
     document.body.style.userSelect = 'none';
     window.getSelection()?.removeAllRanges();
@@ -314,7 +341,7 @@
   <!-- Main -->
   <main class="main">
     <!-- Sidebar -->
-    <aside class="sidebar" style:width="{uiStore.sidebarWidth}px">
+    <aside class="sidebar" bind:this={sidebarRef} style:width="{uiStore.sidebarWidth}px">
       <section class="sidebar-section">
         <h3 class="sidebar-heading">Snapshots</h3>
         {#if contextStore.snapshots.length === 0}
@@ -574,6 +601,7 @@
     flex-shrink: 0;
     overflow-y: auto;
     overflow-x: hidden;
+    scrollbar-gutter: stable;
   }
 
   /* Sidebar Resize Handle */
