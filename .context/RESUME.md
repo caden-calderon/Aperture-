@@ -654,6 +654,27 @@ make test-ui     # Frontend tests
 
 ---
 
+### 2026-02-05: UI Polish — 7 Bug Fixes
+
+**Completed:**
+- [x] **Theme presets responsive layout** — Changed from fixed 4-column grid to `auto-fill minmax(48px, 1fr)`, wraps correctly when sidebar narrows
+- [x] **Compact drag ghost** — Custom `setDragImage()` creates small pill (type label + count) instead of cloning the full block element
+- [x] **Zone resize dead zone fix** — Snaps stored height to actual `scrollHeight` on resize start, preventing visual lag when content < max-height
+- [x] **Fade gradient overflow-only** — `::after` gradient now only shows when `<pre>` scrollHeight > clientHeight (short blocks no longer appear faded)
+- [x] **Text selection during resize** — Global `html.is-resizing` class applies `user-select: none !important` everywhere
+- [x] **Sidebar scrollbar flickering** — Added `scrollbar-gutter: stable` to reserve scrollbar space
+- [x] **Smooth sidebar resize** — rAF-throttled direct DOM updates during drag, single reactive commit on mouseup
+
+**Files Changed:**
+- `src/app.css` — Global resize lock styles
+- `src/lib/components/ContextBlock.svelte` — Overflow detection, compact drag ghost, dragging style
+- `src/lib/components/ThemeCustomizer.svelte` — Responsive preset grid
+- `src/routes/+page.svelte` — rAF sidebar resize, zone height snap, scrollbar-gutter, sidebar ref
+
+**Commit:** `7695afc`
+
+---
+
 ### Next Session TODO
 
 - [ ] Test all features in `npm run tauri dev` (full desktop app)
