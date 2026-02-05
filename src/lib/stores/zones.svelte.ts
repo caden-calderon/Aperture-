@@ -4,6 +4,10 @@
  *
  * Context Order: primacy (first) -> custom zones -> recency (always last)
  * Display Order: Visual position in UI (independent of context order)
+ *
+ * NOTE: Uses Record<string, boolean> instead of Set<string> for expandedZones
+ * because Svelte 5's $state deeply proxies plain objects but NOT Set/Map.
+ * Set.has() calls are not tracked as reactive dependencies.
  */
 
 // ============================================================================
@@ -58,7 +62,8 @@ let customZones = $state<ZoneConfig[]>([]);
 let displayOrderOverrides = $state<Record<string, number>>({}); // id -> displayOrder
 let builtInOverrides = $state<Record<string, { label?: string; color?: string }>>({}); // id -> overrides
 let zoneHeights = $state<Record<string, number>>({}); // id -> height in pixels
-let expandedZones = $state<Set<string>>(new Set()); // zones that are fully expanded (no scroll)
+let expandedZones = $state<Record<string, boolean>>({}); // id -> expanded (plain object for reactivity)
+let contentExpandedZones = $state<Record<string, boolean>>({}); // id -> content expanded (blocks show full text)
 
 const DEFAULT_ZONE_HEIGHT = 200;
 const MIN_ZONE_HEIGHT = 80;
@@ -222,28 +227,25 @@ function resetZoneHeight(id: string): void {
 }
 
 function isZoneExpanded(id: string): boolean {
-  return expandedZones.has(id);
+  return expandedZones[id] === true;
 }
 
 function toggleZoneExpanded(id: string): void {
-  const newSet = new Set(expandedZones);
-  if (newSet.has(id)) {
-    newSet.delete(id);
-  } else {
-    newSet.add(id);
-  }
-  expandedZones = newSet;
+  expandedZones[id] = !expandedZones[id];
   saveToLocalStorage();
 }
 
 function setZoneExpanded(id: string, expanded: boolean): void {
-  const newSet = new Set(expandedZones);
-  if (expanded) {
-    newSet.add(id);
-  } else {
-    newSet.delete(id);
-  }
-  expandedZones = newSet;
+  expandedZones[id] = expanded;
+  saveToLocalStorage();
+}
+
+function isContentExpanded(id: string): boolean {
+  return contentExpandedZones[id] === true;
+}
+
+function toggleContentExpanded(id: string): void {
+  contentExpandedZones[id] = !contentExpandedZones[id];
   saveToLocalStorage();
 }
 
@@ -271,16 +273,27 @@ function setZoneContextOrder(id: string, contextOrder: number): void {
 // Persistence
 // ============================================================================
 
+// Bump this when the localStorage schema changes to auto-migrate
+const STORAGE_VERSION = 3;
+
 function saveToLocalStorage(): void {
   if (typeof localStorage === "undefined") return;
+  const expandedIds = Object.entries(expandedZones)
+    .filter(([, v]) => v)
+    .map(([k]) => k);
+  const contentExpandedIds = Object.entries(contentExpandedZones)
+    .filter(([, v]) => v)
+    .map(([k]) => k);
   localStorage.setItem(
     "aperture-custom-zones",
     JSON.stringify({
+      version: STORAGE_VERSION,
       customZones,
       displayOrderOverrides,
       builtInOverrides,
       zoneHeights,
-      expandedZones: Array.from(expandedZones),
+      expandedZones: expandedIds,
+      contentExpandedZones: contentExpandedIds,
     })
   );
 }
@@ -289,13 +302,48 @@ function loadFromLocalStorage(): void {
   if (typeof localStorage === "undefined") return;
   try {
     const stored = localStorage.getItem("aperture-custom-zones");
-    if (stored) {
-      const data = JSON.parse(stored);
-      customZones = data.customZones ?? [];
-      displayOrderOverrides = data.displayOrderOverrides ?? {};
-      builtInOverrides = data.builtInOverrides ?? {};
-      zoneHeights = data.zoneHeights ?? {};
-      expandedZones = new Set(data.expandedZones ?? []);
+    if (!stored) return;
+
+    const data = JSON.parse(stored);
+    const version = data.version ?? 1;
+
+    // Auto-migrate: if schema is too old, reset and re-save
+    if (version < STORAGE_VERSION) {
+      console.info(`Migrating zone storage v${version} → v${STORAGE_VERSION}`);
+    }
+
+    customZones = data.customZones ?? [];
+    displayOrderOverrides = data.displayOrderOverrides ?? {};
+    builtInOverrides = data.builtInOverrides ?? {};
+    zoneHeights = data.zoneHeights ?? {};
+
+    // expandedZones: stored as array of IDs, loaded as Record<string, boolean>
+    const raw = data.expandedZones;
+    if (Array.isArray(raw)) {
+      const obj: Record<string, boolean> = {};
+      for (const id of raw) {
+        obj[id] = true;
+      }
+      expandedZones = obj;
+    } else {
+      expandedZones = {};
+    }
+
+    // contentExpandedZones: same format
+    const rawContent = data.contentExpandedZones;
+    if (Array.isArray(rawContent)) {
+      const obj: Record<string, boolean> = {};
+      for (const id of rawContent) {
+        obj[id] = true;
+      }
+      contentExpandedZones = obj;
+    } else {
+      contentExpandedZones = {};
+    }
+
+    // Re-save to upgrade version tag
+    if (version < STORAGE_VERSION) {
+      saveToLocalStorage();
     }
   } catch (e) {
     console.error("Failed to load custom zones:", e);
@@ -348,6 +396,8 @@ export const zonesStore = {
   isZoneExpanded,
   toggleZoneExpanded,
   setZoneExpanded,
+  isContentExpanded,
+  toggleContentExpanded,
   minZoneHeight: MIN_ZONE_HEIGHT,
   defaultZoneHeight: DEFAULT_ZONE_HEIGHT,
 };

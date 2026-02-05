@@ -581,18 +581,51 @@ make test-ui     # Frontend tests
 
 ---
 
-### Next Session: Fix Zone Resize & Polish
+### 2026-02-05: Zone Resize Bug Fix + Svelte 5 Reactivity Fix
 
-**Known Bugs to Fix:**
-- [ ] **Primacy/Recency zones don't resize** — Middle and custom zones resize fine, but primacy/recency don't respond to drag
-- [ ] **Primacy/Recency always expanded** — No inner scroll, they just grow with content. Middle/custom zones work correctly with inner scroll
-- [ ] Likely same root cause — something specific to built-in primacy/recency zones
+**Root Cause Found:** Svelte 5's `$state` does NOT deeply proxy `Set`/`Map`. `Set.has()` calls are not tracked as reactive dependencies. This broke expand/resize for zones whose expanded state was persisted in localStorage.
+
+**Fixed:**
+- [x] **Replaced `Set<string>` with `Record<string, boolean>`** for `expandedZones` in zones.svelte.ts — property access on plain objects IS tracked by `$state`
+- [x] **Removed redundant `--zone-color` CSS prop** from +page.svelte — was creating a Svelte `display: contents` wrapper
+- [x] **Inline styles for zone height/overflow** — removed CSS class dependency (`.zone-content.expanded`), now fully controlled via `style:max-height` and `style:overflow-y`
+- [x] **localStorage schema versioning** — `STORAGE_VERSION` field for auto-migration
+- [x] **Cleared Tauri webview cache** — old stuck state was in `~/.local/share/com.aperture.app/localstorage/`
+- [x] **Lint fixes** — removed unused `themeStore` import (TitleBar), unused `DEFAULT_SIDEBAR_WIDTH` (ui.svelte.ts)
+- [x] **More demo blocks** — primacy now has 4 blocks, recency has 5, so scroll behavior is testable
+
+**Files Changed:**
+- `src/lib/stores/zones.svelte.ts` — Set→Record, schema versioning, simplified toggle/set
+- `src/lib/components/Zone.svelte` — inline styles, removed CSS class expand, increased bottom padding
+- `src/routes/+page.svelte` — removed `--zone-color` prop, auto-unexpand on resize start
+- `src/lib/mock-data.ts` — more demo blocks in primacy/recency
+- `src/lib/components/TitleBar.svelte` — removed unused import
+- `src/lib/stores/ui.svelte.ts` — removed unused constant
+
+**Key Learning:** In Svelte 5, use `Record<string, boolean>` or `SvelteSet` (from `svelte/reactivity`) — never `$state<Set<T>>` with `.has()`.
+
+**In Progress (from previous session):**
+- Theme role/semantic colors (ThemeCustomizer, theme.svelte.ts) — partially complete, needs testing
+
+---
+
+### Next Session: Zone Polish + Content Expand
+
+**Known Bugs:**
+- [ ] **Resize race condition** — Rapidly toggling expand + resize can lock a zone into permanently expanded state. Likely a state sync issue between `expandedZones` and the resize handler. Observed mainly on primacy but could affect any zone.
+
+**Feature Requests:**
+- [ ] **Two expand modes:**
+  1. **Zone expand** (current ⊞/⊟) — removes zone scroll, shows all blocks
+  2. **Content expand** (new) — expands each context block to show full content inline (no truncation/fade)
+  3. When both active: see ALL info without needing to double-click any block
+- [ ] **More bottom padding on expanded zones** — content still slightly cut off (fade on last line of last block visible). Increase padding further.
 
 **Still TODO:**
-- [ ] Fix zone height/expand state logic
+- [ ] Fix resize race condition bug
+- [ ] Implement content expand mode
 - [ ] Test all features in `npm run tauri dev`
 - [ ] Horizontal zone resize (for future right sidebar)
-- [ ] Verify all localStorage persistence works correctly
 - [ ] Performance check with many blocks
 
-**Phase 0 status: ~90% COMPLETE** — Core UI done, fixing edge cases
+**Phase 0 status: ~95% COMPLETE** — Core bugs fixed, polish items remaining

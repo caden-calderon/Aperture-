@@ -11,9 +11,11 @@
     draggingBlockIds?: string[];
     height?: number;
     expanded?: boolean;
+    contentExpanded?: boolean;
     isResizing?: boolean;
     onToggleCollapse?: () => void;
     onToggleExpanded?: () => void;
+    onToggleContentExpanded?: () => void;
     onBlockSelect?: (id: string, event: { shiftKey: boolean; ctrlKey: boolean; metaKey: boolean }) => void;
     onBlockDoubleClick?: (id: string) => void;
     onBlockDragStart?: (ids: string[]) => void;
@@ -21,7 +23,7 @@
     onDrop?: (zone: ZoneType, blockIds: string[]) => void;
     onCreateBlock?: (zone: ZoneType, typeId: string) => void;
     onReorder?: (zone: ZoneType, blockIds: string[], insertIndex: number) => void;
-    onResizeStart?: (e: MouseEvent) => void;
+    onResizeStart?: (e: MouseEvent, measuredHeight?: number) => void;
   }
 
   let {
@@ -32,9 +34,11 @@
     draggingBlockIds = [],
     height,
     expanded = false,
+    contentExpanded = false,
     isResizing = false,
     onToggleCollapse,
     onToggleExpanded,
+    onToggleContentExpanded,
     onBlockSelect,
     onBlockDoubleClick,
     onBlockDragStart,
@@ -200,7 +204,6 @@
 <section
   class="zone"
   class:collapsed
-  class:expanded
   class:resizing={isResizing}
   class:drag-over={(isDragOver && draggingBlockIds.length > 0) || isTypeDropOver}
   style:--zone-color={config.color}
@@ -232,9 +235,17 @@
     {#if !collapsed}
       <button
         class="expand-toggle"
+        class:active={contentExpanded}
+        onclick={onToggleContentExpanded}
+        title={contentExpanded ? "Truncate block content" : "Show full block content"}
+      >
+        ☰
+      </button>
+      <button
+        class="expand-toggle"
         class:active={expanded}
         onclick={onToggleExpanded}
-        title={expanded ? "Collapse to scrollable" : "Expand to show all"}
+        title={expanded ? "Collapse to scrollable" : "Expand to show all blocks"}
       >
         {expanded ? "⊟" : "⊞"}
       </button>
@@ -244,9 +255,10 @@
   {#if !collapsed}
     <div
       class="zone-content"
-      class:expanded
+      class:zone-expanded={expanded}
       bind:this={zoneContentRef}
-      style:max-height={expanded ? undefined : (height ? `${height}px` : undefined)}
+      style:max-height={expanded ? "none" : `${height ?? 200}px`}
+      style:overflow-y={expanded ? "visible" : "auto"}
     >
       {#if blocks.length === 0}
         <div class="zone-empty">Drop blocks here</div>
@@ -259,6 +271,7 @@
             {block}
             selected={selectedIds.has(block.id)}
             dragging={draggingBlockIds.includes(block.id)}
+            {contentExpanded}
             {selectedIds}
             onSelect={onBlockSelect}
             onDoubleClick={onBlockDoubleClick}
@@ -276,7 +289,7 @@
     <div
       class="zone-resize-handle"
       class:active={isResizing}
-      onmousedown={(e) => { e.preventDefault(); e.stopPropagation(); onResizeStart?.(e); }}
+      onmousedown={(e) => { e.preventDefault(); e.stopPropagation(); onResizeStart?.(e, zoneContentRef?.scrollHeight); }}
     >
       <div class="resize-grip-line"></div>
     </div>
@@ -416,16 +429,19 @@
   }
 
   .zone-content {
-    padding: calc(4px * var(--density-scale, 1)) calc(10px * var(--density-scale, 1)) calc(10px * var(--density-scale, 1)) 12px;
+    padding: calc(4px * var(--density-scale, 1)) calc(10px * var(--density-scale, 1)) calc(14px * var(--density-scale, 1)) 12px;
     border-top: 1px solid var(--border-subtle);
     display: flex;
     flex-direction: column;
     gap: calc(4px * var(--density-scale, 1));
     animation: zone-expand 0.15s ease-out;
-    max-height: 300px;
-    overflow-y: auto;
+    /* max-height and overflow-y controlled via inline styles */
     scrollbar-width: thin;
     scrollbar-color: var(--border-default) transparent;
+  }
+
+  .zone-content.zone-expanded {
+    padding-bottom: calc(20px * var(--density-scale, 1));
   }
 
   .zone-content::-webkit-scrollbar {
@@ -443,11 +459,6 @@
 
   .zone-content::-webkit-scrollbar-thumb:hover {
     background: var(--text-muted);
-  }
-
-  .zone-content.expanded {
-    max-height: none;
-    overflow-y: visible;
   }
 
   /* Zone resize handle */

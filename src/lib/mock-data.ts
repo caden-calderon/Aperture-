@@ -317,6 +317,32 @@ export function generateDemoBlocks(): Block[] {
   systemBlock.pinned = "top";
   blocks.push(systemBlock);
 
+  // Additional primacy blocks (project context, always included)
+  blocks.push(
+    createBlock({
+      role: "system",
+      content: `Project: Aperture - Universal LLM Context Proxy\nStack: Tauri v2 + Svelte 5 + Rust (axum)\nPhase: 0 - UI Foundation\nAesthetic: Halftone/dithering, Obra Dinn meets IDE`,
+      zone: "primacy",
+      usageHeat: 0.9,
+    })
+  );
+  blocks.push(
+    createBlock({
+      role: "system",
+      content: `Code Standards:\n- Svelte 5 runes: $state, $derived, $effect\n- Rust: thiserror for domain errors, anyhow for app errors\n- Tailwind for layout, custom CSS for effects\n- JetBrains Mono for code, IBM Plex Mono for headers`,
+      zone: "primacy",
+      usageHeat: 0.85,
+    })
+  );
+  blocks.push(
+    createBlock({
+      role: "system",
+      content: `Architecture decisions:\n- Proxy via ANTHROPIC_BASE_URL / OPENAI_API_BASE env vars\n- Three layers: Rust proxy core, Rust context engine, Svelte 5 + Canvas UI\n- Non-destructive compression: originals always preserved\n- Cleaner model sidecar for background tasks`,
+      zone: "primacy",
+      usageHeat: 0.88,
+    })
+  );
+
   // Conversation turns in middle zone
   for (let i = 0; i < USER_MESSAGES.length; i++) {
     // User message
@@ -364,7 +390,7 @@ export function generateDemoBlocks(): Block[] {
     }
   }
 
-  // Recent context in recency zone
+  // Recent context in recency zone (more blocks to demonstrate scrolling)
   blocks.push(
     createBlock({
       role: "user",
@@ -392,6 +418,33 @@ The shortcuts will:
 - **S**: Quick save snapshot`,
       zone: "recency",
       usageHeat: 0.85,
+    })
+  );
+
+  blocks.push(
+    createBlock({
+      role: "user",
+      content: "Can you also add Ctrl+Z for undo? And make the snapshot restore reversible.",
+      zone: "recency",
+      usageHeat: 0.82,
+    })
+  );
+
+  blocks.push(
+    createBlock({
+      role: "assistant",
+      content: `For undo/redo, I'll implement a command history stack:\n\n1. Each action (move, delete, compress) pushes to the stack\n2. Ctrl+Z pops and reverses the last action\n3. Ctrl+Shift+Z redoes\n4. Stack is limited to 50 entries to prevent memory issues\n\nSnapshot restore will auto-create a "before restore" snapshot first.`,
+      zone: "recency",
+      usageHeat: 0.87,
+    })
+  );
+
+  blocks.push(
+    createBlock({
+      role: "user",
+      content: "Perfect. One more thing — add a visual indicator showing which blocks changed since the last snapshot.",
+      zone: "recency",
+      usageHeat: 0.9,
     })
   );
 

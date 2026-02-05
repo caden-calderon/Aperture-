@@ -7,17 +7,30 @@
 // ============================================================================
 
 export interface ThemeColors {
+  // Background colors
   bgBase: string;
   bgSurface: string;
   bgElevated: string;
   bgHover: string;
   bgMuted: string;
+  // Border colors
   borderSubtle: string;
   borderDefault: string;
+  // Text colors
   textPrimary: string;
   textSecondary: string;
   textMuted: string;
+  // Accent
   accent: string;
+  // Role/block type colors
+  roleSystem: string;
+  roleUser: string;
+  roleAssistant: string;
+  roleTool: string;
+  // Semantic colors
+  semanticDanger: string;
+  semanticWarning: string;
+  semanticSuccess: string;
 }
 
 export interface ThemePreset {
@@ -50,6 +63,13 @@ export const PRESETS: ThemePreset[] = [
       textSecondary: '#ded1b6',
       textMuted: '#a89880',
       accent: '#f5f5dc',
+      roleSystem: '#9080a8',
+      roleUser: '#7090b0',
+      roleAssistant: '#80a880',
+      roleTool: '#b0a080',
+      semanticDanger: '#c86860',
+      semanticWarning: '#c8a060',
+      semanticSuccess: '#70a870',
     },
   },
   {
@@ -68,6 +88,13 @@ export const PRESETS: ThemePreset[] = [
       textSecondary: '#a9b1d6',
       textMuted: '#565f89',
       accent: '#7aa2f7',
+      roleSystem: '#bb9af7',
+      roleUser: '#7aa2f7',
+      roleAssistant: '#9ece6a',
+      roleTool: '#e0af68',
+      semanticDanger: '#f7768e',
+      semanticWarning: '#e0af68',
+      semanticSuccess: '#9ece6a',
     },
   },
   {
@@ -86,6 +113,13 @@ export const PRESETS: ThemePreset[] = [
       textSecondary: '#d5c4a1',
       textMuted: '#a89984',
       accent: '#fe8019',
+      roleSystem: '#d3869b',
+      roleUser: '#83a598',
+      roleAssistant: '#b8bb26',
+      roleTool: '#fabd2f',
+      semanticDanger: '#fb4934',
+      semanticWarning: '#fabd2f',
+      semanticSuccess: '#b8bb26',
     },
   },
   {
@@ -104,6 +138,13 @@ export const PRESETS: ThemePreset[] = [
       textSecondary: '#bac2de',
       textMuted: '#a6adc8',
       accent: '#cba6f7',
+      roleSystem: '#cba6f7',
+      roleUser: '#89b4fa',
+      roleAssistant: '#a6e3a1',
+      roleTool: '#f9e2af',
+      semanticDanger: '#f38ba8',
+      semanticWarning: '#fab387',
+      semanticSuccess: '#a6e3a1',
     },
   },
   {
@@ -122,6 +163,13 @@ export const PRESETS: ThemePreset[] = [
       textSecondary: '#e5e9f0',
       textMuted: '#a3be8c',
       accent: '#88c0d0',
+      roleSystem: '#b48ead',
+      roleUser: '#81a1c1',
+      roleAssistant: '#a3be8c',
+      roleTool: '#ebcb8b',
+      semanticDanger: '#bf616a',
+      semanticWarning: '#ebcb8b',
+      semanticSuccess: '#a3be8c',
     },
   },
   {
@@ -140,6 +188,13 @@ export const PRESETS: ThemePreset[] = [
       textSecondary: '#e6e6dc',
       textMuted: '#6272a4',
       accent: '#bd93f9',
+      roleSystem: '#bd93f9',
+      roleUser: '#8be9fd',
+      roleAssistant: '#50fa7b',
+      roleTool: '#ffb86c',
+      semanticDanger: '#ff5555',
+      semanticWarning: '#ffb86c',
+      semanticSuccess: '#50fa7b',
     },
   },
   {
@@ -158,6 +213,13 @@ export const PRESETS: ThemePreset[] = [
       textSecondary: '#9da5b4',
       textMuted: '#5c6370',
       accent: '#61afef',
+      roleSystem: '#c678dd',
+      roleUser: '#61afef',
+      roleAssistant: '#98c379',
+      roleTool: '#e5c07b',
+      semanticDanger: '#e06c75',
+      semanticWarning: '#e5c07b',
+      semanticSuccess: '#98c379',
     },
   },
   {
@@ -176,6 +238,13 @@ export const PRESETS: ThemePreset[] = [
       textSecondary: '#eee8d5',
       textMuted: '#93a1a1',
       accent: '#2aa198',
+      roleSystem: '#d33682',
+      roleUser: '#268bd2',
+      roleAssistant: '#859900',
+      roleTool: '#b58900',
+      semanticDanger: '#dc322f',
+      semanticWarning: '#cb4b16',
+      semanticSuccess: '#859900',
     },
   },
   // === LIGHT THEMES ===
@@ -195,6 +264,13 @@ export const PRESETS: ThemePreset[] = [
       textSecondary: '#4a4540',
       textMuted: '#6a6560',
       accent: '#2a2520',
+      roleSystem: '#6a4878',
+      roleUser: '#3a5878',
+      roleAssistant: '#3a6848',
+      roleTool: '#705838',
+      semanticDanger: '#a04848',
+      semanticWarning: '#907030',
+      semanticSuccess: '#3a6838',
     },
   },
   {
@@ -213,6 +289,13 @@ export const PRESETS: ThemePreset[] = [
       textSecondary: '#504945',
       textMuted: '#7c6f64',
       accent: '#d65d0e',
+      roleSystem: '#8f3f71',
+      roleUser: '#076678',
+      roleAssistant: '#79740e',
+      roleTool: '#b57614',
+      semanticDanger: '#9d0006',
+      semanticWarning: '#b57614',
+      semanticSuccess: '#79740e',
     },
   },
   {
@@ -231,6 +314,13 @@ export const PRESETS: ThemePreset[] = [
       textSecondary: '#4c505e',
       textMuted: '#6c6f7e',
       accent: '#2e7de9',
+      roleSystem: '#9854f1',
+      roleUser: '#2e7de9',
+      roleAssistant: '#587539',
+      roleTool: '#8a5b0e',
+      semanticDanger: '#c64343',
+      semanticWarning: '#8a5b0e',
+      semanticSuccess: '#587539',
     },
   },
   {
@@ -249,6 +339,13 @@ export const PRESETS: ThemePreset[] = [
       textSecondary: '#5a5040',
       textMuted: '#7a7060',
       accent: '#6a5030',
+      roleSystem: '#704878',
+      roleUser: '#406080',
+      roleAssistant: '#486848',
+      roleTool: '#806030',
+      semanticDanger: '#904040',
+      semanticWarning: '#906820',
+      semanticSuccess: '#406838',
     },
   },
   {
@@ -267,6 +364,13 @@ export const PRESETS: ThemePreset[] = [
       textSecondary: '#586e75',
       textMuted: '#93a1a1',
       accent: '#268bd2',
+      roleSystem: '#d33682',
+      roleUser: '#268bd2',
+      roleAssistant: '#859900',
+      roleTool: '#b58900',
+      semanticDanger: '#dc322f',
+      semanticWarning: '#cb4b16',
+      semanticSuccess: '#859900',
     },
   },
 ];
@@ -329,6 +433,7 @@ function applyColors(colors: ThemeColors, isDark: boolean): void {
 
   const root = document.documentElement;
 
+  // Background colors
   root.style.setProperty('--bg-base', colors.bgBase);
   root.style.setProperty('--bg-surface', colors.bgSurface);
   root.style.setProperty('--bg-elevated', colors.bgElevated);
@@ -336,18 +441,32 @@ function applyColors(colors: ThemeColors, isDark: boolean): void {
   root.style.setProperty('--bg-muted', colors.bgMuted);
   root.style.setProperty('--bg-inset', adjustBrightness(colors.bgBase, isDark ? -0.02 : -0.03));
 
+  // Border colors
   root.style.setProperty('--border-subtle', colors.borderSubtle);
   root.style.setProperty('--border-default', colors.borderDefault);
   root.style.setProperty('--border-strong', adjustBrightness(colors.borderDefault, isDark ? 0.1 : -0.15));
 
+  // Text colors
   root.style.setProperty('--text-primary', colors.textPrimary);
   root.style.setProperty('--text-secondary', colors.textSecondary);
   root.style.setProperty('--text-muted', colors.textMuted);
   root.style.setProperty('--text-faint', adjustBrightness(colors.textMuted, isDark ? -0.15 : 0.15));
 
+  // Accent colors
   root.style.setProperty('--accent', colors.accent);
   root.style.setProperty('--accent-subtle', hexToRgba(colors.accent, 0.08));
   root.style.setProperty('--accent-muted', hexToRgba(colors.accent, 0.16));
+
+  // Role/block type colors
+  root.style.setProperty('--role-system', colors.roleSystem);
+  root.style.setProperty('--role-user', colors.roleUser);
+  root.style.setProperty('--role-assistant', colors.roleAssistant);
+  root.style.setProperty('--role-tool', colors.roleTool);
+
+  // Semantic colors
+  root.style.setProperty('--semantic-danger', colors.semanticDanger);
+  root.style.setProperty('--semantic-warning', colors.semanticWarning);
+  root.style.setProperty('--semantic-success', colors.semanticSuccess);
 
   root.setAttribute('data-theme', isDark ? 'dark' : 'light');
 }

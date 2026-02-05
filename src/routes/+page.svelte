@@ -58,15 +58,23 @@
   }
 
   // Zone resize handlers
-  function handleZoneResizeStart(e: MouseEvent, zoneId: string) {
+  function handleZoneResizeStart(e: MouseEvent, zoneId: string, measuredHeight?: number) {
     e.preventDefault();
     e.stopPropagation();
+
+    // If zone is expanded, capture its actual rendered height before un-expanding
+    if (zonesStore.isZoneExpanded(zoneId)) {
+      if (measuredHeight && measuredHeight > zonesStore.minZoneHeight) {
+        zonesStore.setZoneHeight(zoneId, measuredHeight);
+      }
+      zonesStore.setZoneExpanded(zoneId, false);
+    }
+
     resizingZoneId = zoneId;
     zoneResizeStartY = e.clientY;
     zoneResizeStartHeight = zonesStore.getZoneHeight(zoneId);
     document.body.style.cursor = 'row-resize';
     document.body.style.userSelect = 'none';
-    // Prevent any text selection
     window.getSelection()?.removeAllRanges();
   }
 
@@ -401,9 +409,11 @@
             draggingBlockIds={uiStore.draggingBlockIds}
             height={zonesStore.getZoneHeight(zoneConfig.id)}
             expanded={zonesStore.isZoneExpanded(zoneConfig.id)}
+            contentExpanded={zonesStore.isContentExpanded(zoneConfig.id)}
             isResizing={resizingZoneId === zoneConfig.id}
             onToggleCollapse={() => handleToggleZoneCollapse(zoneConfig.id as ZoneType)}
-            onToggleExpanded={() => zonesStore.toggleZoneExpanded(zoneConfig.id)}
+            onToggleExpanded={() => { if (!resizingZoneId) zonesStore.toggleZoneExpanded(zoneConfig.id); }}
+            onToggleContentExpanded={() => zonesStore.toggleContentExpanded(zoneConfig.id)}
             onBlockSelect={handleBlockSelect}
             onBlockDoubleClick={handleBlockDoubleClick}
             onBlockDragStart={handleBlockDragStart}
@@ -411,8 +421,7 @@
             onDrop={handleZoneDrop}
             onCreateBlock={handleCreateBlock}
             onReorder={handleZoneReorder}
-            onResizeStart={(e) => handleZoneResizeStart(e, zoneConfig.id)}
-            --zone-color={zoneConfig.color}
+            onResizeStart={(e, h) => handleZoneResizeStart(e, zoneConfig.id, h)}
           />
         {/each}
       </div>

@@ -6,19 +6,57 @@
   let showSaveDialog = $state(false);
   let copiedColor = $state<string | null>(null);
   let activeColorPicker = $state<keyof ThemeColors | null>(null);
+  let hoveredColor = $state<string | null>(null);
+  let hoverTimeout = $state<ReturnType<typeof setTimeout> | null>(null);
+  let showHexTooltip = $state(false);
+
+  // Grouped color labels for better organization
+  const colorGroups: { label: string; keys: (keyof ThemeColors)[] }[] = [
+    {
+      label: 'Background',
+      keys: ['bgBase', 'bgSurface', 'bgElevated', 'bgHover', 'bgMuted'],
+    },
+    {
+      label: 'Border',
+      keys: ['borderSubtle', 'borderDefault'],
+    },
+    {
+      label: 'Text',
+      keys: ['textPrimary', 'textSecondary', 'textMuted'],
+    },
+    {
+      label: 'Accent',
+      keys: ['accent'],
+    },
+    {
+      label: 'Block Types',
+      keys: ['roleSystem', 'roleUser', 'roleAssistant', 'roleTool'],
+    },
+    {
+      label: 'Semantic',
+      keys: ['semanticDanger', 'semanticWarning', 'semanticSuccess'],
+    },
+  ];
 
   const colorLabels: Record<keyof ThemeColors, string> = {
-    bgBase: 'Background',
+    bgBase: 'Base',
     bgSurface: 'Surface',
     bgElevated: 'Elevated',
     bgHover: 'Hover',
     bgMuted: 'Muted',
-    borderSubtle: 'Border Light',
-    borderDefault: 'Border',
-    textPrimary: 'Text',
-    textSecondary: 'Text Secondary',
-    textMuted: 'Text Muted',
+    borderSubtle: 'Subtle',
+    borderDefault: 'Default',
+    textPrimary: 'Primary',
+    textSecondary: 'Secondary',
+    textMuted: 'Muted',
     accent: 'Accent',
+    roleSystem: 'System',
+    roleUser: 'User',
+    roleAssistant: 'Assistant',
+    roleTool: 'Tool',
+    semanticDanger: 'Danger',
+    semanticWarning: 'Warning',
+    semanticSuccess: 'Success',
   };
 
   // Get unique colors from current theme for the palette
@@ -41,6 +79,21 @@
       copiedColor = color;
       setTimeout(() => copiedColor = null, 1500);
     }
+  }
+
+  function handlePaletteHover(color: string) {
+    hoveredColor = color;
+    showHexTooltip = false;
+    if (hoverTimeout) clearTimeout(hoverTimeout);
+    hoverTimeout = setTimeout(() => {
+      showHexTooltip = true;
+    }, 500);
+  }
+
+  function handlePaletteLeave() {
+    if (hoverTimeout) clearTimeout(hoverTimeout);
+    hoveredColor = null;
+    showHexTooltip = false;
   }
 
   function handleSaveTheme() {
@@ -133,48 +186,60 @@
         </span>
         <div class="palette-grid">
           {#each getThemePalette() as color}
-            <button
-              class="palette-swatch"
-              style:background={color}
-              onclick={() => handlePaletteClick(color)}
-              title={color}
-            ></button>
+            <div class="palette-swatch-wrap">
+              <button
+                class="palette-swatch"
+                style:background={color}
+                onclick={() => handlePaletteClick(color)}
+                onmouseenter={() => handlePaletteHover(color)}
+                onmouseleave={handlePaletteLeave}
+                aria-label="Color {color}"
+              ></button>
+              {#if showHexTooltip && hoveredColor === color}
+                <div class="hex-tooltip">{color}</div>
+              {/if}
+            </div>
           {/each}
         </div>
       </div>
 
-      <!-- Color Pickers -->
+      <!-- Color Pickers - Grouped -->
       <div class="colors-section">
         <span class="label">Customize Colors</span>
-        <div class="color-grid">
-          {#each Object.entries(colorLabels) as [key, label]}
-            <div
-              class="color-row"
-              class:active={activeColorPicker === key}
-            >
-              <button
-                class="color-label-btn"
-                onclick={() => activeColorPicker = activeColorPicker === key ? null : key as keyof ThemeColors}
-                title="Click to enable palette apply"
-              >
-                {label}
-                {#if activeColorPicker === key}
-                  <span class="target-icon">*</span>
-                {/if}
-              </button>
-              <div class="color-input-wrap">
-                <input
-                  type="color"
-                  value={themeStore.effectiveColors[key as keyof ThemeColors]}
-                  oninput={(e) => handleColorChange(key as keyof ThemeColors, e)}
-                />
-                <span class="color-value">
-                  {themeStore.effectiveColors[key as keyof ThemeColors]}
-                </span>
-              </div>
+        {#each colorGroups as group}
+          <div class="color-group">
+            <span class="group-label">{group.label}</span>
+            <div class="color-grid">
+              {#each group.keys as key}
+                <div
+                  class="color-row"
+                  class:active={activeColorPicker === key}
+                >
+                  <button
+                    class="color-label-btn"
+                    onclick={() => activeColorPicker = activeColorPicker === key ? null : key}
+                    title="Click to enable palette apply"
+                  >
+                    {colorLabels[key]}
+                    {#if activeColorPicker === key}
+                      <span class="target-icon">*</span>
+                    {/if}
+                  </button>
+                  <div class="color-input-wrap">
+                    <input
+                      type="color"
+                      value={themeStore.effectiveColors[key]}
+                      oninput={(e) => handleColorChange(key, e)}
+                    />
+                    <span class="color-value">
+                      {themeStore.effectiveColors[key]}
+                    </span>
+                  </div>
+                </div>
+              {/each}
             </div>
-          {/each}
-        </div>
+          </div>
+        {/each}
       </div>
 
       <!-- Actions -->
@@ -257,8 +322,8 @@
   }
 
   .preset-grid {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
     gap: 4px;
   }
 
@@ -270,14 +335,14 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 4px;
-    padding: 6px;
+    gap: 3px;
+    padding: 4px;
     background: var(--bg-elevated);
     border: 1px solid var(--border-subtle);
     border-radius: 4px;
     cursor: pointer;
     transition: all 0.1s ease;
-    min-width: 52px;
+    width: 100%;
   }
 
   .preset-btn:hover {
@@ -290,9 +355,9 @@
   }
 
   .preset-swatch {
-    width: 28px;
-    height: 20px;
-    border-radius: 3px;
+    width: 24px;
+    height: 18px;
+    border-radius: 2px;
     border: 1px solid;
     display: flex;
     align-items: center;
@@ -300,17 +365,18 @@
   }
 
   .preset-text {
-    font-size: 10px;
+    font-size: 9px;
     font-weight: 600;
   }
 
   .preset-name {
-    font-size: 8px;
+    font-size: 7px;
     color: var(--text-muted);
-    max-width: 48px;
+    max-width: 100%;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    text-align: center;
   }
 
   .delete-btn {
@@ -346,6 +412,10 @@
     gap: 4px;
   }
 
+  .palette-swatch-wrap {
+    position: relative;
+  }
+
   .palette-swatch {
     width: 20px;
     height: 20px;
@@ -360,6 +430,29 @@
     transform: scale(1.15);
     box-shadow: 0 2px 8px rgba(0,0,0,0.2);
     z-index: 1;
+  }
+
+  .hex-tooltip {
+    position: absolute;
+    bottom: calc(100% + 4px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-default);
+    border-radius: 3px;
+    padding: 2px 6px;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--text-primary);
+    white-space: nowrap;
+    z-index: 10;
+    pointer-events: none;
+    animation: tooltip-fade 0.15s ease;
+  }
+
+  @keyframes tooltip-fade {
+    from { opacity: 0; transform: translateX(-50%) translateY(2px); }
+    to { opacity: 1; transform: translateX(-50%) translateY(0); }
   }
 
   .copied-badge,
@@ -382,10 +475,29 @@
     color: var(--bg-surface);
   }
 
+  .color-group {
+    margin-bottom: 8px;
+  }
+
+  .color-group:last-child {
+    margin-bottom: 0;
+  }
+
+  .group-label {
+    display: block;
+    font-size: 8px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: var(--text-faint);
+    margin-bottom: 4px;
+    padding-left: 2px;
+  }
+
   .color-grid {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 2px;
   }
 
   .color-row {

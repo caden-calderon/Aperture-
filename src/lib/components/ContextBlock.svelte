@@ -6,6 +6,7 @@
     block: Block;
     selected?: boolean;
     dragging?: boolean;
+    contentExpanded?: boolean;
     selectedIds?: Set<string>;
     onSelect?: (id: string, event: { shiftKey: boolean; ctrlKey: boolean; metaKey: boolean }) => void;
     onDoubleClick?: (id: string) => void;
@@ -17,6 +18,7 @@
     block,
     selected = false,
     dragging = false,
+    contentExpanded = false,
     selectedIds = new Set<string>(),
     onSelect,
     onDoubleClick,
@@ -108,8 +110,8 @@
     <span class="token-count">{formatTokens(block.tokens)}</span>
   </div>
 
-  <div class="block-content">
-    <pre>{getPreview(block.content)}</pre>
+  <div class="block-content" class:content-expanded={contentExpanded}>
+    <pre>{contentExpanded ? block.content : getPreview(block.content)}</pre>
   </div>
 
   {#if block.compressionLevel !== "original"}
@@ -254,6 +256,14 @@
     margin: 0;
     max-height: calc(60px * var(--density-scale, 1));
     overflow: hidden;
+  }
+
+  .block-content.content-expanded pre {
+    max-height: none;
+  }
+
+  .block-content.content-expanded::after {
+    display: none;
   }
 
   /* Fade out at bottom of truncated content */

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { themeStore } from '$lib/stores';
+  // TitleBar uses CSS variables from the theme, no need to import store
 
   // Window controls (Tauri APIs)
   async function minimize() {
