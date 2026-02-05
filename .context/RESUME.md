@@ -609,23 +609,56 @@ make test-ui     # Frontend tests
 
 ---
 
-### Next Session: Zone Polish + Content Expand
+### 2026-02-05: Content Expand, Modal Edit, Persistence
 
-**Known Bugs:**
-- [ ] **Resize race condition** — Rapidly toggling expand + resize can lock a zone into permanently expanded state. Likely a state sync issue between `expandedZones` and the resize handler. Observed mainly on primacy but could affect any zone.
+**Completed:**
+- [x] **Fixed resize race condition** — Measures actual scrollHeight before un-expanding, guards expand toggle during active resize
+- [x] **Content expand mode (☰ button)** — Per-zone toggle to show full block content inline (no truncation/fade)
+- [x] **Per-block collapse/expand (▾/▸ button)** — Collapse individual blocks to header-only, independent of zone expand
+- [x] **Editable modal content** — ✎ Edit button or double-click to enter edit mode with textarea
+- [x] **Expandable modal content** — "Expand content" button for long blocks, modal resizes (75vh→90vh, wider)
+- [x] **Block persistence** — All blocks, edits, moves, pins, compressions saved to localStorage (`aperture-context`)
+- [x] **contextStore.init()** — Loads persisted data on startup, falls back to demo data if empty
+- [x] **Fixed Tailwind v4 error** — Swapped Vite plugin order (sveltekit → tailwindcss) to prevent `Invalid declaration: onMount`
+- [x] **Fixed zone name in toasts** — Custom zones now show label instead of ID in notifications
+- [x] **Expanded zone bottom padding** — Tuned to 14px default, 20px expanded
 
-**Feature Requests:**
-- [ ] **Two expand modes:**
-  1. **Zone expand** (current ⊞/⊟) — removes zone scroll, shows all blocks
-  2. **Content expand** (new) — expands each context block to show full content inline (no truncation/fade)
-  3. When both active: see ALL info without needing to double-click any block
-- [ ] **More bottom padding on expanded zones** — content still slightly cut off (fade on last line of last block visible). Increase padding further.
+**Known Limitations:**
+- **Spellcheck not working in Tauri/Linux** — WebKitGTK spellcheck requires system `enchant` + `hunspell` packages AND a WebKitGTK build compiled with spell-check support. The HTML `spellcheck="true"` + `lang="en"` attributes are set correctly; works in browsers and macOS/Windows Tauri. On Linux, this is a platform limitation of WebKitGTK — not fixable from application code.
 
-**Still TODO:**
-- [ ] Fix resize race condition bug
-- [ ] Implement content expand mode
-- [ ] Test all features in `npm run tauri dev`
+**Files Changed:**
+- `vite.config.js` — Plugin order fix
+- `src/lib/stores/context.svelte.ts` — localStorage persistence, init(), updateBlockContent()
+- `src/lib/stores/zones.svelte.ts` — contentExpandedZones state, schema v3
+- `src/lib/components/Modal.svelte` — Edit mode, expandable content, spellcheck attrs
+- `src/lib/components/ContextBlock.svelte` — Per-block collapse toggle, contentExpanded prop
+- `src/lib/components/Zone.svelte` — Content expand button, measured resize, expanded padding
+- `src/routes/+page.svelte` — Wiring, zone name fix, resize guard, content edit handler
+
+**Component summary (15 total):**
+| Component | Purpose |
+|-----------|---------|
+| `TokenBudgetBar` | Token usage with canvas halftone |
+| `Zone` | Collapsible zone containers with resize, zone/content expand |
+| `ContextBlock` | Individual blocks with per-block collapse, content expand |
+| `Modal` | Block detail modal with edit mode, expandable content |
+| `Toast` | Notification toasts |
+| `CanvasOverlay` | Generic canvas effects layer |
+| `CommandPalette` | Cmd+K quick actions |
+| `ThemeToggle` | Light/dark mode toggle |
+| `ThemeCustomizer` | Full theme editor with 13 presets |
+| `DensityControl` | UI scale slider |
+| `TitleBar` | Custom window title bar |
+| `BlockTypeManager` | Manage block types (built-in + custom) |
+| `ZoneManager` | Manage zones (built-in + custom) |
+
+---
+
+### Next Session TODO
+
+- [ ] Test all features in `npm run tauri dev` (full desktop app)
 - [ ] Horizontal zone resize (for future right sidebar)
 - [ ] Performance check with many blocks
+- [ ] User's UI additions and fixes
 
-**Phase 0 status: ~95% COMPLETE** — Core bugs fixed, polish items remaining
+**Phase 0 status: ~98% COMPLETE** — All core features implemented, persistence working
