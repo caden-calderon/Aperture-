@@ -81,6 +81,16 @@ export interface Session {
 // Snapshot Types
 // ============================================================================
 
+export interface SnapshotZoneState {
+  customZones: Array<{id: string; label: string; color: string; isBuiltIn: boolean; contextOrder: number; displayOrder: number}>;
+  displayOrderOverrides: Record<string, number>;
+  builtInOverrides: Record<string, { label?: string; color?: string }>;
+  zoneHeights: Record<string, number>;
+  expandedZones: string[];
+  contentExpandedZones: string[];
+  tokenHistory: Record<string, number[]>;
+}
+
 export interface Snapshot {
   id: string;
   name: string;
@@ -88,6 +98,8 @@ export interface Snapshot {
   blocks: Block[];
   totalTokens: number;
   type: "hard" | "soft";
+  zoneState?: SnapshotZoneState | null;
+  parentSnapshotId?: string | null;
 }
 
 // ============================================================================

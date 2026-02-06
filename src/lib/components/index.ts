@@ -19,3 +19,6 @@ export { default as SearchBar } from "./SearchBar.svelte";
 export { default as ContextMenu } from "./ContextMenu.svelte";
 export { default as Terminal } from "./Terminal.svelte";
 export { default as TerminalPanel } from "./TerminalPanel.svelte";
+export { default as ZoneMinimap } from "./ZoneMinimap.svelte";
+export { default as Sparkline } from "./Sparkline.svelte";
+export { default as ContextDiff } from "./ContextDiff.svelte";

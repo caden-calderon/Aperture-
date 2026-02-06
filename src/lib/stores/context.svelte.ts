@@ -6,12 +6,14 @@
  * Persists blocks and snapshots to localStorage
  */
 
-import type { Block, Zone, TokenBudget, Snapshot, Role } from "../types";
+import type { Block, Zone, TokenBudget, Snapshot, SnapshotZoneState, Role } from "../types";
 import {
   generateDemoBlocks,
   generateDemoSnapshots,
   calculateTokenBudget,
 } from "../mock-data";
+import { editHistoryStore } from "./editHistory.svelte";
+import { zonesStore } from "./zones.svelte";
 
 // ============================================================================
 // State
@@ -20,6 +22,10 @@ import {
 let blocks = $state<Block[]>([]);
 let snapshots = $state<Snapshot[]>([]);
 const tokenLimit = 200000;
+
+// Branching state: null = working state, string = viewing a snapshot
+let activeSnapshotId = $state<string | null>(null);
+let workingStateCache = $state<{ blocks: Block[]; zoneState: SnapshotZoneState } | null>(null);
 
 // ============================================================================
 // Persistence
@@ -32,7 +38,7 @@ function saveToLocalStorage(): void {
   try {
     localStorage.setItem(
       STORAGE_KEY,
-      JSON.stringify({ blocks, snapshots })
+      JSON.stringify({ blocks, snapshots, activeSnapshotId, workingStateCache })
     );
   } catch (e) {
     console.error("Failed to save context:", e);
@@ -53,6 +59,7 @@ function loadFromLocalStorage(): boolean {
       ...b,
       timestamp: new Date(b.timestamp),
     }));
+    // Migrate snapshots: add zoneState/parentSnapshotId if missing
     snapshots = (data.snapshots ?? []).map((s: Snapshot) => ({
       ...s,
       timestamp: new Date(s.timestamp),
@@ -60,7 +67,14 @@ function loadFromLocalStorage(): boolean {
         ...b,
         timestamp: new Date(b.timestamp),
       })),
+      zoneState: s.zoneState ?? null,
+      parentSnapshotId: s.parentSnapshotId ?? null,
     }));
+
+    // Restore branching state (defaults for migration)
+    activeSnapshotId = data.activeSnapshotId ?? null;
+    workingStateCache = data.workingStateCache ?? null;
+
     return true;
   } catch (e) {
     console.error("Failed to load context:", e);
@@ -105,6 +119,12 @@ const tokenBudget = $derived<TokenBudget>(calculateTokenBudget(blocks));
 
 const blockMap = $derived(new Map(blocks.map((b) => [b.id, b])));
 
+const activeStateLabel = $derived.by(() => {
+  if (!activeSnapshotId) return "Working State";
+  const snap = snapshots.find(s => s.id === activeSnapshotId);
+  return snap?.name ?? "Unknown Snapshot";
+});
+
 // ============================================================================
 // Actions
 // ============================================================================
@@ -118,7 +138,7 @@ function init(): void {
 
 function loadDemoData(): void {
   blocks = generateDemoBlocks();
-  snapshots = generateDemoSnapshots();
+  snapshots = generateDemoSnapshots(blocks);
   saveToLocalStorage();
 }
 
@@ -134,6 +154,11 @@ function moveBlock(blockId: string, targetZone: Zone): void {
   const index = getBlockIndex(blockId);
   if (index === -1) return;
 
+  const oldZone = blocks[index].zone;
+  if (oldZone !== targetZone) {
+    editHistoryStore.recordEdit(blockId, "zone", { zone: oldZone }, { zone: targetZone });
+  }
+
   blocks[index] = { ...blocks[index], zone: targetZone };
   blocks = [...blocks];
   saveToLocalStorage();
@@ -146,12 +171,16 @@ function moveBlocks(blockIds: string[], targetZone: Zone): void {
 }
 
 function removeBlock(blockId: string): void {
+  editHistoryStore.clearBlockHistory(blockId);
   blocks = blocks.filter((b) => b.id !== blockId);
   saveToLocalStorage();
 }
 
 function removeBlocks(blockIds: string[]): void {
   const idSet = new Set(blockIds);
+  for (const id of idSet) {
+    editHistoryStore.clearBlockHistory(id);
+  }
   blocks = blocks.filter((b) => !idSet.has(b.id));
   saveToLocalStorage();
 }
@@ -193,6 +222,11 @@ function updateBlockContent(blockId: string, content: string): void {
   const index = getBlockIndex(blockId);
   if (index === -1) return;
 
+  const oldContent = blocks[index].content;
+  if (oldContent !== content) {
+    editHistoryStore.recordEdit(blockId, "content", { content: oldContent }, { content });
+  }
+
   const tokens = Math.ceil(content.length / 4);
   blocks[index] = {
     ...blocks[index],
@@ -210,6 +244,17 @@ function updateBlockContent(blockId: string, content: string): void {
 function setBlockRole(blockId: string, role: Role, blockType?: string): void {
   const index = getBlockIndex(blockId);
   if (index === -1) return;
+
+  const oldRole = blocks[index].role;
+  const oldBlockType = blocks[index].blockType ?? null;
+  if (oldRole !== role || oldBlockType !== (blockType ?? null)) {
+    editHistoryStore.recordEdit(
+      blockId, "role",
+      { role: oldRole, blockType: oldBlockType },
+      { role, blockType: blockType ?? null }
+    );
+  }
+
   blocks[index] = { ...blocks[index], role, blockType };
   blocks = [...blocks];
   saveToLocalStorage();
@@ -271,6 +316,15 @@ function setCompressionLevel(
   const index = getBlockIndex(blockId);
   if (index === -1) return;
 
+  const oldLevel = blocks[index].compressionLevel;
+  if (oldLevel !== level) {
+    editHistoryStore.recordEdit(
+      blockId, "compression",
+      { compressionLevel: oldLevel },
+      { compressionLevel: level }
+    );
+  }
+
   blocks[index] = { ...blocks[index], compressionLevel: level };
   blocks = [...blocks];
   saveToLocalStorage();
@@ -279,6 +333,15 @@ function setCompressionLevel(
 function pinBlock(blockId: string, position: Block["pinned"]): void {
   const index = getBlockIndex(blockId);
   if (index === -1) return;
+
+  const oldPin = blocks[index].pinned;
+  if (oldPin !== position) {
+    editHistoryStore.recordEdit(
+      blockId, "pin",
+      { pinned: oldPin ?? null },
+      { pinned: position ?? null }
+    );
+  }
 
   blocks[index] = { ...blocks[index], pinned: position };
   blocks = [...blocks];
@@ -315,6 +378,8 @@ function saveSnapshot(name: string): Snapshot {
     blocks: JSON.parse(JSON.stringify(blocks)),
     totalTokens: tokenBudget.used,
     type: "soft",
+    zoneState: zonesStore.captureState(),
+    parentSnapshotId: activeSnapshotId,
   };
 
   snapshots = [...snapshots, snapshot];
@@ -323,16 +388,86 @@ function saveSnapshot(name: string): Snapshot {
 }
 
 function restoreSnapshot(snapshotId: string): boolean {
-  const snapshot = snapshots.find((s) => s.id === snapshotId);
-  if (!snapshot) return false;
+  return switchToSnapshot(snapshotId);
+}
 
-  blocks = JSON.parse(JSON.stringify(snapshot.blocks));
+function deleteSnapshot(snapshotId: string): void {
+  // If deleting the active snapshot, switch to working state first
+  if (activeSnapshotId === snapshotId) {
+    switchToWorkingState();
+  }
+  snapshots = snapshots.filter((s) => s.id !== snapshotId);
+  saveToLocalStorage();
+}
+
+function switchToSnapshot(snapshotId: string): boolean {
+  const target = snapshots.find(s => s.id === snapshotId);
+  if (!target) return false;
+
+  // Save current state back
+  if (activeSnapshotId === null) {
+    // Save working state to cache
+    workingStateCache = {
+      blocks: JSON.parse(JSON.stringify(blocks)),
+      zoneState: zonesStore.captureState(),
+    };
+  } else {
+    // Save current blocks back to the active snapshot
+    const activeIdx = snapshots.findIndex(s => s.id === activeSnapshotId);
+    if (activeIdx !== -1) {
+      snapshots[activeIdx] = {
+        ...snapshots[activeIdx],
+        blocks: JSON.parse(JSON.stringify(blocks)),
+        zoneState: zonesStore.captureState(),
+        totalTokens: tokenBudget.used,
+      };
+      snapshots = [...snapshots];
+    }
+  }
+
+  // Load target snapshot
+  blocks = JSON.parse(JSON.stringify(target.blocks));
+  if (target.zoneState) {
+    zonesStore.restoreState(target.zoneState);
+  }
+  activeSnapshotId = snapshotId;
   saveToLocalStorage();
   return true;
 }
 
-function deleteSnapshot(snapshotId: string): void {
-  snapshots = snapshots.filter((s) => s.id !== snapshotId);
+function switchToWorkingState(): void {
+  if (activeSnapshotId === null) return;
+
+  // Save current blocks back to active snapshot
+  const activeIdx = snapshots.findIndex(s => s.id === activeSnapshotId);
+  if (activeIdx !== -1) {
+    snapshots[activeIdx] = {
+      ...snapshots[activeIdx],
+      blocks: JSON.parse(JSON.stringify(blocks)),
+      zoneState: zonesStore.captureState(),
+      totalTokens: tokenBudget.used,
+    };
+    snapshots = [...snapshots];
+  }
+
+  // Restore working state from cache
+  if (workingStateCache) {
+    blocks = JSON.parse(JSON.stringify(workingStateCache.blocks));
+    if (workingStateCache.zoneState) {
+      zonesStore.restoreState(workingStateCache.zoneState);
+    }
+    workingStateCache = null;
+  }
+
+  activeSnapshotId = null;
+  saveToLocalStorage();
+}
+
+function renameSnapshot(snapshotId: string, name: string): void {
+  const idx = snapshots.findIndex(s => s.id === snapshotId);
+  if (idx === -1) return;
+  snapshots[idx] = { ...snapshots[idx], name };
+  snapshots = [...snapshots];
   saveToLocalStorage();
 }
 
@@ -357,6 +492,12 @@ export const contextStore = {
   get snapshots() {
     return snapshots;
   },
+  get activeSnapshotId() {
+    return activeSnapshotId;
+  },
+  get activeStateLabel() {
+    return activeStateLabel;
+  },
 
   // Actions
   init,
@@ -380,4 +521,7 @@ export const contextStore = {
   saveSnapshot,
   restoreSnapshot,
   deleteSnapshot,
+  switchToSnapshot,
+  switchToWorkingState,
+  renameSnapshot,
 };

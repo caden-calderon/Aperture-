@@ -603,22 +603,39 @@ export function generateDemoSession(): Session {
   };
 }
 
-export function generateDemoSnapshots(): Snapshot[] {
+export function generateDemoSnapshots(currentBlocks: Block[]): Snapshot[] {
+  // Build snapshot from a subset of current blocks with some modifications
+  // "Before refactor" — early subset, some blocks in different zones
+  const earlyBlocks = currentBlocks.slice(0, Math.ceil(currentBlocks.length * 0.6)).map((b) => ({
+    ...b,
+    // Simulate some blocks being in different zones
+    zone: b.zone === "recency" ? "middle" as Zone : b.zone,
+  }));
+  const earlyTokens = earlyBlocks.reduce((sum, b) => sum + b.tokens, 0);
+
+  // "Working state" — most blocks, some with different compression
+  const workingBlocks = currentBlocks.slice(0, Math.ceil(currentBlocks.length * 0.85)).map((b, i) => ({
+    ...b,
+    // Simulate a few blocks being in original compression
+    compressionLevel: (i % 5 === 0 ? "original" : b.compressionLevel) as CompressionLevel,
+  }));
+  const workingTokens = workingBlocks.reduce((sum, b) => sum + b.tokens, 0);
+
   return [
     {
       id: "snap-1",
       name: "Before refactor",
       timestamp: new Date(Date.now() - 1800000),
-      blocks: [],
-      totalTokens: 45000,
+      blocks: earlyBlocks,
+      totalTokens: earlyTokens,
       type: "hard",
     },
     {
       id: "snap-2",
       name: "Working state",
       timestamp: new Date(Date.now() - 600000),
-      blocks: [],
-      totalTokens: 67420,
+      blocks: workingBlocks,
+      totalTokens: workingTokens,
       type: "soft",
     },
   ];

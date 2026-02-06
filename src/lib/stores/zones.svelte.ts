@@ -68,6 +68,10 @@ let contentExpandedZones = $state<Record<string, boolean>>({}); // id -> content
 const DEFAULT_ZONE_HEIGHT = 200;
 const MIN_ZONE_HEIGHT = 80;
 
+// Token history: last N data points per zone for sparklines
+const MAX_HISTORY_POINTS = 20;
+let tokenHistory = $state<Record<string, number[]>>({});
+
 // ============================================================================
 // Derived
 // ============================================================================
@@ -270,11 +274,77 @@ function setZoneContextOrder(id: string, contextOrder: number): void {
 }
 
 // ============================================================================
+// Token History (for sparklines)
+// ============================================================================
+
+/**
+ * Record a token snapshot for zones. Call when blocks change.
+ * Accepts a pre-computed map of zoneId→tokenCount to avoid
+ * reading reactive derived state (allZones) inside $effects.
+ */
+function recordTokenSnapshot(tokensByZone: Record<string, number>): void {
+  let changed = false;
+  const updated = { ...tokenHistory };
+
+  for (const [zoneId, tokens] of Object.entries(tokensByZone)) {
+    const history = updated[zoneId] ?? [];
+    // Skip if same as last value to avoid flat lines
+    if (history.length > 0 && history[history.length - 1] === tokens) continue;
+    // Seed first entry with 0 so sparkline has ≥2 points immediately
+    if (history.length === 0) {
+      updated[zoneId] = [0, tokens];
+    } else {
+      updated[zoneId] = [...history.slice(-(MAX_HISTORY_POINTS - 1)), tokens];
+    }
+    changed = true;
+  }
+
+  // Only trigger reactivity if data actually changed
+  if (changed) {
+    tokenHistory = updated;
+    saveToLocalStorage();
+  }
+}
+
+function getTokenHistory(zoneId: string): number[] {
+  return tokenHistory[zoneId] ?? [];
+}
+
+// ============================================================================
+// State Capture / Restore (for snapshots)
+// ============================================================================
+
+import type { SnapshotZoneState } from "../types";
+
+function captureState(): SnapshotZoneState {
+  return {
+    customZones: JSON.parse(JSON.stringify(customZones)),
+    displayOrderOverrides: { ...displayOrderOverrides },
+    builtInOverrides: JSON.parse(JSON.stringify(builtInOverrides)),
+    zoneHeights: { ...zoneHeights },
+    expandedZones: Object.entries(expandedZones).filter(([, v]) => v).map(([k]) => k),
+    contentExpandedZones: Object.entries(contentExpandedZones).filter(([, v]) => v).map(([k]) => k),
+    tokenHistory: JSON.parse(JSON.stringify(tokenHistory)),
+  };
+}
+
+function restoreState(state: SnapshotZoneState): void {
+  customZones = state.customZones ?? [];
+  displayOrderOverrides = state.displayOrderOverrides ?? {};
+  builtInOverrides = state.builtInOverrides ?? {};
+  zoneHeights = state.zoneHeights ?? {};
+  expandedZones = Object.fromEntries((state.expandedZones ?? []).map(id => [id, true]));
+  contentExpandedZones = Object.fromEntries((state.contentExpandedZones ?? []).map(id => [id, true]));
+  tokenHistory = state.tokenHistory ?? {};
+  saveToLocalStorage();
+}
+
+// ============================================================================
 // Persistence
 // ============================================================================
 
 // Bump this when the localStorage schema changes to auto-migrate
-const STORAGE_VERSION = 3;
+const STORAGE_VERSION = 4;
 
 function saveToLocalStorage(): void {
   if (typeof localStorage === "undefined") return;
@@ -294,6 +364,7 @@ function saveToLocalStorage(): void {
       zoneHeights,
       expandedZones: expandedIds,
       contentExpandedZones: contentExpandedIds,
+      tokenHistory,
     })
   );
 }
@@ -339,6 +410,13 @@ function loadFromLocalStorage(): void {
       contentExpandedZones = obj;
     } else {
       contentExpandedZones = {};
+    }
+
+    // Token history for sparklines
+    if (data.tokenHistory && typeof data.tokenHistory === "object") {
+      tokenHistory = data.tokenHistory;
+    } else {
+      tokenHistory = {};
     }
 
     // Re-save to upgrade version tag
@@ -400,4 +478,12 @@ export const zonesStore = {
   toggleContentExpanded,
   minZoneHeight: MIN_ZONE_HEIGHT,
   defaultZoneHeight: DEFAULT_ZONE_HEIGHT,
+
+  // Token history (sparklines)
+  recordTokenSnapshot,
+  getTokenHistory,
+
+  // State capture/restore (for snapshots)
+  captureState,
+  restoreState,
 };

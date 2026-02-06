@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { TokenBudgetBar, Zone, Modal, Toast, CommandPalette, ThemeToggle, DensityControl, TitleBar, ThemeCustomizer, BlockTypeManager, ZoneManager, SearchBar, TerminalPanel, ContextMenu } from "$lib/components";
-  import { contextStore, selectionStore, uiStore, themeStore, blockTypesStore, zonesStore, searchStore, terminalStore } from "$lib/stores";
+  import { TokenBudgetBar, Zone, Modal, Toast, CommandPalette, ThemeToggle, DensityControl, TitleBar, ThemeCustomizer, BlockTypeManager, ZoneManager, SearchBar, TerminalPanel, ContextMenu, ZoneMinimap, ContextDiff } from "$lib/components";
+  import { contextStore, selectionStore, uiStore, themeStore, blockTypesStore, zonesStore, searchStore, terminalStore, editHistoryStore } from "$lib/stores";
   import type { Zone as ZoneType, Block } from "$lib/types";
 
   // Sidebar resize state
@@ -24,6 +24,19 @@
   let terminalPanelRef = $state<HTMLElement | null>(null);
   let terminalPanelComponentRef = $state<ReturnType<typeof TerminalPanel> | null>(null);
   let contentRef = $state<HTMLElement | null>(null);
+
+  // Diff view state
+  let diffViewOpen = $state(false);
+  let diffFilterZone = $state<string | null>(null);
+  let diffHighlightBlockId = $state<string | null>(null);
+
+  // Snapshot CRUD state
+  let editingSnapshotId = $state<string | null>(null);
+  let editSnapshotName = $state("");
+  let deleteConfirmId = $state<string | null>(null);
+
+  // Zones container ref (for minimap scroll targeting)
+  let zonesRef = $state<HTMLElement | null>(null);
 
   // Context menu state
   let contextMenuBlock = $state<string | null>(null);
@@ -54,8 +67,14 @@
     // Initialize context panel state
     uiStore.initContextPanel();
 
+    // Initialize minimap
+    uiStore.initMinimap();
+
     // Initialize terminal store
     terminalStore.init();
+
+    // Initialize edit history
+    editHistoryStore.init();
 
     // Load persisted blocks or demo data
     contextStore.init();
@@ -76,6 +95,21 @@
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
+  });
+
+  // Record token history for sparklines whenever blocks change.
+  // We pre-compute the tokensByZone map here to avoid reading derived
+  // state (like allZones) inside the store function, which would create
+  // unintended reactive dependencies and potential infinite loops.
+  $effect(() => {
+    const byZone = contextStore.blocksByZone;
+    if (contextStore.blocks.length === 0) return;
+
+    const tokensByZone: Record<string, number> = {};
+    for (const [zoneId, blocks] of Object.entries(byZone)) {
+      tokensByZone[zoneId] = blocks.reduce((sum, b) => sum + b.tokens, 0);
+    }
+    zonesStore.recordTokenSnapshot(tokensByZone);
   });
 
   // Reactively update terminal theme when theme changes
@@ -538,6 +572,10 @@
       case 'toggle-context-panel':
         uiStore.toggleContextPanel();
         break;
+      case 'toggle-minimap':
+        uiStore.toggleMinimap();
+        uiStore.showToast(uiStore.minimapVisible ? 'Minimap shown' : 'Minimap hidden', 'info');
+        break;
       case 'expand-all-zones': {
         uiStore.expandAllZones();
         // Also expand all zone heights
@@ -691,6 +729,11 @@
         uiStore.showToast(`Saved: ${snap.name}`, 'success');
         break;
       }
+      case 'diff-view':
+        diffFilterZone = null;
+        diffHighlightBlockId = null;
+        diffViewOpen = true;
+        break;
       case 'load-demo':
         contextStore.loadDemoData();
         uiStore.showToast('Demo data loaded', 'success');
@@ -755,21 +798,104 @@
       {:else}
         <section class="sidebar-section">
           <h3 class="sidebar-heading">Snapshots</h3>
+
+          <!-- State badge -->
+          <div class="state-badge" class:on-snapshot={contextStore.activeSnapshotId}>
+            <span class="state-label">{contextStore.activeStateLabel}</span>
+            {#if contextStore.activeSnapshotId}
+              <button
+                class="state-back-btn"
+                onclick={() => {
+                  contextStore.switchToWorkingState();
+                  uiStore.showToast("Switched to Working State", "info");
+                }}
+              >Back to Working</button>
+            {/if}
+          </div>
+
           {#if contextStore.snapshots.length === 0}
             <p class="sidebar-empty">No snapshots</p>
           {:else}
             <div class="snapshot-list">
               {#each contextStore.snapshots as snapshot (snapshot.id)}
-                <button
+                <!-- svelte-ignore a11y_no_static_element_interactions -->
+                <div
                   class="snapshot-item"
-                  onclick={() => {
-                    contextStore.restoreSnapshot(snapshot.id);
-                    uiStore.showToast(`Restored: ${snapshot.name}`, "success");
+                  class:snapshot-active={contextStore.activeSnapshotId === snapshot.id}
+                  ondblclick={() => {
+                    contextStore.switchToSnapshot(snapshot.id);
+                    uiStore.showToast(`Switched to: ${snapshot.name}`, "info");
                   }}
                 >
-                  <span class="snapshot-name">{snapshot.name}</span>
-                  <span class="snapshot-meta">{formatNumber(snapshot.totalTokens)}</span>
-                </button>
+                  <div class="snapshot-info">
+                    {#if editingSnapshotId === snapshot.id}
+                      <input
+                        class="snapshot-rename-input"
+                        bind:value={editSnapshotName}
+                        onblur={() => {
+                          if (editSnapshotName.trim()) {
+                            contextStore.renameSnapshot(snapshot.id, editSnapshotName.trim());
+                          }
+                          editingSnapshotId = null;
+                        }}
+                        onkeydown={(e) => {
+                          if (e.key === 'Enter') {
+                            if (editSnapshotName.trim()) {
+                              contextStore.renameSnapshot(snapshot.id, editSnapshotName.trim());
+                            }
+                            editingSnapshotId = null;
+                          }
+                          if (e.key === 'Escape') {
+                            editingSnapshotId = null;
+                          }
+                        }}
+                      />
+                    {:else}
+                      <span class="snapshot-name">{snapshot.name}</span>
+                    {/if}
+                    <span class="snapshot-meta">{formatNumber(snapshot.totalTokens)} tokens</span>
+                  </div>
+                  <div class="snapshot-actions">
+                    <button
+                      class="snapshot-action-btn"
+                      onclick={() => {
+                        contextStore.switchToSnapshot(snapshot.id);
+                        uiStore.showToast(`Switched to: ${snapshot.name}`, "info");
+                      }}
+                      title="Switch to"
+                    >↗</button>
+                    <button
+                      class="snapshot-action-btn"
+                      onclick={() => {
+                        editingSnapshotId = snapshot.id;
+                        editSnapshotName = snapshot.name;
+                        requestAnimationFrame(() => {
+                          const input = document.querySelector('.snapshot-rename-input') as HTMLInputElement;
+                          input?.focus();
+                          input?.select();
+                        });
+                      }}
+                      title="Rename"
+                    >✎</button>
+                    {#if deleteConfirmId === snapshot.id}
+                      <button
+                        class="snapshot-action-btn snapshot-confirm-delete"
+                        onclick={() => {
+                          contextStore.deleteSnapshot(snapshot.id);
+                          deleteConfirmId = null;
+                          uiStore.showToast(`Deleted: ${snapshot.name}`, "success");
+                        }}
+                        onblur={() => deleteConfirmId = null}
+                      >Confirm?</button>
+                    {:else}
+                      <button
+                        class="snapshot-action-btn snapshot-delete-btn"
+                        onclick={() => deleteConfirmId = snapshot.id}
+                        title="Delete"
+                      >×</button>
+                    {/if}
+                  </div>
+                </div>
               {/each}
             </div>
           {/if}
@@ -853,6 +979,23 @@
               <strong>{selectionStore.count}</strong> selected
               <span class="toolbar-sep">·</span>
               <strong>{formatNumber(selectionStore.selectedTokens)}</strong> tokens
+              {#if uiStore.minimapVisible && contextStore.blocks.length > 0}
+                <ZoneMinimap
+                  zonesContainer={zonesRef}
+                  onDrop={handleZoneDrop}
+                />
+              {:else if contextStore.blocks.length > 0}
+                <button
+                  class="btn btn-sm minimap-show-btn"
+                  title="Show minimap"
+                  onclick={() => uiStore.toggleMinimap()}
+                >
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+                    <rect x="1" y="2" width="3" height="6" rx="0.5" />
+                    <rect x="5" y="1" width="4" height="8" rx="0.5" />
+                  </svg>
+                </button>
+              {/if}
             </div>
             <div class="toolbar-actions">
               <button class="btn btn-sm" onclick={() => uiStore.toggleContextPanel()} title="Collapse context panel">
@@ -884,7 +1027,7 @@
           <SearchBar />
 
           <!-- Zones -->
-          <div class="zones" class:resizing={resizingZoneId !== null}>
+          <div class="zones" class:resizing={resizingZoneId !== null} bind:this={zonesRef}>
             {#if contextStore.blocks.length === 0}
               <div class="empty-state">
                 <div class="empty-icon">
@@ -948,6 +1091,7 @@
                 />
               {/each}
             {/if}
+
           </div>
         </div>
       {/if}
@@ -1005,6 +1149,17 @@
   onRemove={handleModalRemove}
   onRoleChange={handleModalRoleChange}
   onContentEdit={handleModalContentEdit}
+  onOpenDiff={(filterZone, highlightBlockId) => {
+    diffFilterZone = filterZone ?? null;
+    diffHighlightBlockId = highlightBlockId ?? null;
+    uiStore.closeModal();
+    diffViewOpen = true;
+  }}
+  onRevert={(blockId, content) => {
+    contextStore.updateBlockContent(blockId, content);
+    uiStore.showToast("Reverted to previous version", "success");
+  }}
+  snapshots={contextStore.snapshots}
 />
 
 <!-- Toasts -->
@@ -1015,6 +1170,19 @@
   open={uiStore.commandPaletteOpen}
   onClose={() => uiStore.toggleCommandPalette()}
   onCommand={handleCommand}
+/>
+
+<!-- Context Diff View -->
+<ContextDiff
+  open={diffViewOpen}
+  onClose={() => { diffViewOpen = false; diffFilterZone = null; diffHighlightBlockId = null; }}
+  filterZone={diffFilterZone}
+  highlightBlockId={diffHighlightBlockId}
+  onOpenBlock={(blockId: string) => { diffViewOpen = false; diffFilterZone = null; diffHighlightBlockId = null; uiStore.openModal(blockId); }}
+  onRevert={(blockId: string, content: string) => {
+    contextStore.updateBlockContent(blockId, content);
+    uiStore.showToast("Reverted to snapshot version", "success");
+  }}
 />
 
 <!-- Context Menu (right-click) -->
@@ -1303,13 +1471,61 @@
     margin-bottom: var(--space-sm);
   }
 
+  /* State badge */
+  .state-badge {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    padding: 4px 8px;
+    margin-bottom: var(--space-sm);
+    border-radius: 3px;
+    background: var(--bg-inset);
+    border: 1px solid var(--border-subtle);
+  }
+
+  .state-badge.on-snapshot {
+    background: color-mix(in srgb, var(--accent) 10%, var(--bg-inset));
+    border-color: color-mix(in srgb, var(--accent) 30%, var(--border-subtle));
+  }
+
+  .state-label {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .state-back-btn {
+    font-family: var(--font-mono);
+    font-size: 8px;
+    padding: 2px 5px;
+    border: 1px solid var(--border-default);
+    border-radius: 2px;
+    background: var(--bg-surface);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.1s ease;
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+
+  .state-back-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+    border-color: var(--border-strong);
+  }
+
   /* Snapshots */
   .snapshot-list {
     display: flex;
     flex-direction: column;
     gap: 3px;
     margin-bottom: var(--space-sm);
-    max-height: 100px;
+    max-height: 160px;
     overflow-y: auto;
   }
 
@@ -1321,10 +1537,10 @@
     background: var(--bg-elevated);
     border: 1px solid var(--border-subtle);
     border-radius: 3px;
-    cursor: pointer;
     transition: all 0.1s ease;
     text-align: left;
     width: 100%;
+    gap: 4px;
   }
 
   .snapshot-item:hover {
@@ -1332,15 +1548,92 @@
     border-color: var(--border-default);
   }
 
+  .snapshot-item.snapshot-active {
+    border-left: 3px solid var(--accent);
+    background: color-mix(in srgb, var(--accent) 8%, var(--bg-elevated));
+  }
+
+  .snapshot-info {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+    flex: 1;
+  }
+
   .snapshot-name {
     font-size: 10px;
     color: var(--text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .snapshot-meta {
     font-size: 9px;
     color: var(--text-muted);
     font-variant-numeric: tabular-nums;
+  }
+
+  .snapshot-rename-input {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    padding: 1px 4px;
+    background: var(--bg-base);
+    border: 1px solid var(--accent);
+    border-radius: 2px;
+    color: var(--text-primary);
+    outline: none;
+    width: 100%;
+  }
+
+  .snapshot-actions {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    flex-shrink: 0;
+    opacity: 0;
+    transition: opacity 0.1s ease;
+  }
+
+  .snapshot-item:hover .snapshot-actions {
+    opacity: 1;
+  }
+
+  .snapshot-item.snapshot-active .snapshot-actions {
+    opacity: 1;
+  }
+
+  .snapshot-action-btn {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    padding: 2px 5px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 2px;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.1s ease;
+    line-height: 1;
+  }
+
+  .snapshot-action-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+    border-color: var(--border-default);
+  }
+
+  .snapshot-delete-btn:hover {
+    color: var(--semantic-danger);
+    border-color: color-mix(in srgb, var(--semantic-danger) 40%, transparent);
+  }
+
+  .snapshot-confirm-delete {
+    font-size: 8px;
+    padding: 1px 4px;
+    color: var(--semantic-danger);
+    border-color: var(--semantic-danger);
+    background: color-mix(in srgb, var(--semantic-danger) 10%, transparent);
   }
 
   /* Shortcuts */
@@ -1461,9 +1754,14 @@
   }
 
   .toolbar-info {
+    display: flex;
+    align-items: center;
+    gap: 6px;
     font-size: 11px;
     color: var(--text-muted);
     font-variant-numeric: tabular-nums;
+    flex: 1;
+    min-width: 0;
   }
 
   .toolbar-info strong {
@@ -1474,6 +1772,15 @@
   .toolbar-sep {
     margin: 0 4px;
     opacity: 0.4;
+  }
+
+  .minimap-show-btn {
+    opacity: 0.4;
+    transition: opacity 0.1s ease;
+  }
+
+  .minimap-show-btn:hover {
+    opacity: 1;
   }
 
   .toolbar-actions {
@@ -1490,6 +1797,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-sm);
+    position: relative;
     scrollbar-width: thin;
     scrollbar-color: var(--border-default) transparent;
   }

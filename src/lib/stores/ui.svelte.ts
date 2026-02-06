@@ -34,6 +34,9 @@ let contextPanelCollapsed = $state(false);
 // Density: 0.8 = compact, 1.0 = normal, 1.2 = comfortable
 let density = $state(1.0);
 
+// Minimap visibility
+let minimapVisible = $state(false);
+
 // ============================================================================
 // Derived State
 // ============================================================================
@@ -177,7 +180,7 @@ function initContextPanel(): void {
   if (typeof localStorage === 'undefined') return;
   const stored = localStorage.getItem('aperture-context-panel-collapsed');
   if (stored) {
-    try { contextPanelCollapsed = JSON.parse(stored); } catch {}
+    try { contextPanelCollapsed = JSON.parse(stored); } catch { /* invalid JSON, keep default */ }
   }
 }
 
@@ -272,6 +275,25 @@ function initDensity(): void {
 }
 
 // ============================================================================
+// Minimap Actions
+// ============================================================================
+
+function toggleMinimap(): void {
+  minimapVisible = !minimapVisible;
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem('aperture-minimap-visible', JSON.stringify(minimapVisible));
+  }
+}
+
+function initMinimap(): void {
+  if (typeof localStorage === 'undefined') return;
+  const stored = localStorage.getItem('aperture-minimap-visible');
+  if (stored) {
+    try { minimapVisible = JSON.parse(stored); } catch { /* invalid JSON, keep default */ }
+  }
+}
+
+// ============================================================================
 // Export Store Interface
 // ============================================================================
 
@@ -328,6 +350,9 @@ export const uiStore = {
   get density() {
     return density;
   },
+  get minimapVisible() {
+    return minimapVisible;
+  },
 
   // Modal
   openModal,
@@ -372,4 +397,8 @@ export const uiStore = {
   decreaseDensity,
   resetDensity,
   initDensity,
+
+  // Minimap
+  toggleMinimap,
+  initMinimap,
 };

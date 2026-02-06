@@ -20,6 +20,7 @@
     { id: 'toggle-primacy', label: 'Toggle Primacy Zone', shortcut: '', category: 'View' },
     { id: 'toggle-middle', label: 'Toggle Middle Zone', shortcut: '', category: 'View' },
     { id: 'toggle-recency', label: 'Toggle Recency Zone', shortcut: '', category: 'View' },
+    { id: 'toggle-minimap', label: 'Toggle Minimap', shortcut: '', category: 'View' },
 
     // Search
     { id: 'search', label: 'Search Context', shortcut: '⌘F', category: 'Search' },
@@ -50,6 +51,7 @@
 
     // Data
     { id: 'snapshot', label: 'Save Snapshot', shortcut: 'S', category: 'Data' },
+    { id: 'diff-view', label: 'Compare with Snapshot (Diff)', shortcut: '', category: 'Data' },
     { id: 'load-demo', label: 'Load Demo Data', shortcut: '', category: 'Data' },
     { id: 'clear-all-blocks', label: 'Clear All Blocks', shortcut: '', category: 'Data' },
   ];

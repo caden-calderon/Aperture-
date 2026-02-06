@@ -3,6 +3,7 @@
   import { contextStore, zonesStore } from "$lib/stores";
   import { slide } from "svelte/transition";
   import ContextBlock from "./ContextBlock.svelte";
+  import Sparkline from "./Sparkline.svelte";
 
   interface Props {
     zone: ZoneType;
@@ -85,6 +86,7 @@
   });
   let totalTokens = $derived(blocks.reduce((sum, b) => sum + b.tokens, 0));
   let selectedInZone = $derived(blocks.filter((b) => selectedIds.has(b.id)));
+  let tokenHistory = $derived(zonesStore.getTokenHistory(zone));
 
   // Thread grouping: group consecutive blocks into conversation threads.
   // A thread starts at a "user" block and includes all following non-user blocks.
@@ -275,6 +277,7 @@
         <span class="zone-label">{config.label}</span>
         <span class="zone-stats">
           {blocks.length} blocks · {formatTokens(totalTokens)} tokens
+          <Sparkline data={tokenHistory} color={config.color} label="{config.label} tokens" />
           {#if selectedInZone.length > 0}
             · <span class="selected-stat">{selectedInZone.length} selected</span>
           {/if}

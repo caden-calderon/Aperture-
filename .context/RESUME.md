@@ -834,15 +834,102 @@ make test-ui     # Frontend tests
 
 ---
 
-### Next Session TODO
+### 2026-02-06: Group 3 — Advanced Visuals Complete
 
-#### Remaining Enhancements (Group 3 — Advanced Visuals)
-1. **Drag-and-drop zone minimap** — Compact visual minimap for quick drag targets without scrolling
-2. **Context diff view** — Diff between compression levels in modal
-3. **Token sparkline per zone** — Inline sparklines in zone headers
+**Completed all 3 remaining enhancements:**
+
+#### 1. Zone Minimap (`ZoneMinimap.svelte`)
+- [x] Compact vertical minimap in sidebar showing all zones as proportional segments
+- [x] Segment height = zone's token % of total (min 8% so empty zones visible)
+- [x] Zone colors, hover tooltips (label + block count + tokens)
+- [x] Click to scroll-to-zone + auto-un-collapse
+- [x] Drag-drop target: drop blocks onto minimap segments to move them between zones
+- [x] Placed in sidebar between ZoneManager and Display sections
+
+#### 2. Context Diff View (`ContextDiff.svelte`)
+- [x] Modal overlay comparing current blocks vs any saved snapshot
+- [x] Snapshot selector dropdown (auto-selects most recent)
+- [x] Diff algorithm: matches blocks by ID, detects added/removed/modified
+- [x] Modified detection: content, zone, compression, tokens, pin, role changes
+- [x] Visual: green (+added), red (−removed), yellow (~modified) with left border color coding
+- [x] Summary stats bar: +N added, −N removed, ~N modified, ±N tokens
+- [x] Accessible via command palette: "Compare with Snapshot (Diff)"
+
+#### 3. Token Sparklines per Zone (`Sparkline.svelte`)
+- [x] Tiny inline SVG sparkline (40×14px) in zone headers next to token count
+- [x] Polyline with filled area under curve, dot on latest value
+- [x] Trend arrow (↑/↓) for visual direction indicator
+- [x] Token history tracking in zones store (`recordTokenSnapshot()`)
+- [x] Stores last 20 data points per zone, persisted to localStorage
+- [x] $effect in +page.svelte records snapshot whenever blocksByZone changes
+- [x] Hover tooltip shows "first → latest (±delta)" range
+- [x] Zone color used for line, deduplicates unchanged values
+
+#### Store Changes
+- `zones.svelte.ts` — Added `tokenHistory` state, `recordTokenSnapshot()`, `getTokenHistory()`, localStorage schema v4
+
+#### New Files
+- `src/lib/components/ZoneMinimap.svelte`
+- `src/lib/components/Sparkline.svelte`
+- `src/lib/components/ContextDiff.svelte`
+
+#### Files Modified
+- `src/lib/components/index.ts` — 3 new exports
+- `src/lib/components/Zone.svelte` — Sparkline import + render in header
+- `src/lib/components/CommandPalette.svelte` — "Compare with Snapshot (Diff)" command
+- `src/lib/stores/zones.svelte.ts` — Token history tracking + schema v4
+- `src/routes/+page.svelte` — ContextDiff modal, ZoneMinimap in sidebar, token history $effect, diff command handler
+
+#### Verification
+- `svelte-check`: 0 errors, 0 warnings
+- `eslint`: clean on all new/modified files
+- `vite build`: successful
+
+---
+
+### 2026-02-06: Snapshot Branching & Diff System Overhaul
+
+**Completed:**
+- [x] **Minimap widened** — max-width 320px → 500px (CSS + animation keyframe)
+- [x] **Modal diff arrows fixed** — ◀ now goes to newer (index--), ▶ goes to older (index++)
+- [x] **Snapshot type expanded** — Added `SnapshotZoneState` interface, `zoneState` and `parentSnapshotId` to `Snapshot`
+- [x] **Zone state capture/restore** — `zonesStore.captureState()` and `restoreState()` serialize/deserialize all zone config
+- [x] **Branching state model** — `activeSnapshotId` (null = working state), `workingStateCache` for saving working state when switching
+- [x] **`switchToSnapshot()`** — Saves current state (to working cache or active snapshot), loads target, restores zones
+- [x] **`switchToWorkingState()`** — Saves current to snapshot, restores working cache
+- [x] **`renameSnapshot()`** — Inline rename with persistence
+- [x] **`saveSnapshot()` enhanced** — Captures zone state + sets `parentSnapshotId` for lineage tracking
+- [x] **`restoreSnapshot()` delegates** — Now calls `switchToSnapshot()` (same behavior, unified API)
+- [x] **`deleteSnapshot()` safety** — Switches to working state first if deleting active snapshot
+- [x] **Persistence migration** — Existing localStorage data gets `activeSnapshotId: null`, `workingStateCache: null`, snapshots get `zoneState: null`, `parentSnapshotId: null`
+- [x] **State badge in sidebar** — Shows "Working State" or snapshot name, with "Back to Working" button
+- [x] **Snapshot CRUD UI** — Inline rename (input + blur/enter/escape), delete with confirmation, switch button (↗), rename button (✎), delete button (×)
+- [x] **Active snapshot highlight** — Accent left border + visible actions for active snapshot
+- [x] **ContextDiff multi-snapshot comparison** — Default mode compares current vs selected snapshot (auto-selects most recent non-active), advanced "From/To" mode with two dropdowns (any state including "Current State")
+- [x] **Diff mode toggle** — "From/To" button switches between simple and advanced comparison
+
+**Files Changed:**
+- `src/lib/types.ts` — `SnapshotZoneState` interface, expanded `Snapshot`
+- `src/lib/stores/zones.svelte.ts` — `captureState()`, `restoreState()`, SnapshotZoneState import
+- `src/lib/stores/context.svelte.ts` — Branching state, switching, rename, persistence migration
+- `src/lib/components/ZoneMinimap.svelte` — 500px max-width
+- `src/lib/components/Modal.svelte` — Arrow direction fix
+- `src/lib/components/ContextDiff.svelte` — Advanced From/To mode, mode toggle, updated diff computation
+- `src/routes/+page.svelte` — State badge, snapshot CRUD, new CSS
+
+**Verification:** `svelte-check` 0 errors 0 warnings, `vite build` successful.
+
+---
+
+### Next Session TODO
 
 #### Testing & Stability
 - [ ] Test all features in `npm run tauri dev` (full desktop app)
 - [ ] Performance check with many blocks
 
-**Phase 0 status: ~99% COMPLETE** — All core features + 10/10 enhancements implemented
+#### Future: Snapshot System Phase 2
+- [ ] Visual branch tree (SVG/Canvas showing snapshot lineage, parent→child)
+- [ ] File sandboxing (Tauri backend with git worktrees)
+- [ ] Cross-snapshot element picking (drag blocks between snapshots)
+
+**Phase 0 status: COMPLETE** — All core features + 10/10 enhancements + 3/3 advanced visuals + snapshot branching implemented

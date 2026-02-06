@@ -1,7 +1,8 @@
 <script lang="ts">
-  import type { Block, Role } from "$lib/types";
-  import { blockTypesStore, zonesStore } from "$lib/stores";
+  import type { Block, Role, Snapshot } from "$lib/types";
+  import { blockTypesStore, zonesStore, editHistoryStore } from "$lib/stores";
   import { detectLanguage, highlightCode } from "$lib/utils/syntax";
+  import { diffLines, type DiffLine } from "$lib/utils/diff";
 
   interface Props {
     block: Block | null;
@@ -13,6 +14,9 @@
     onRemove?: () => void;
     onRoleChange?: (role: Role, blockType?: string) => void;
     onContentEdit?: (content: string) => void;
+    onOpenDiff?: (filterZone?: string, highlightBlockId?: string) => void;
+    onRevert?: (blockId: string, content: string) => void;
+    snapshots?: Snapshot[];
   }
 
   let {
@@ -25,6 +29,9 @@
     onRemove,
     onRoleChange,
     onContentEdit,
+    onOpenDiff,
+    onRevert,
+    snapshots = [],
   }: Props = $props();
 
   let roleDropdownOpen = $state(false);
@@ -33,6 +40,10 @@
   let isContentExpanded = $state(false);
   let editContent = $state("");
   let textareaRef = $state<HTMLTextAreaElement | null>(null);
+  let diffExpanded = $state(false);
+  let diffVersionIndex = $state(0);
+  let diffSnapshotFilter = $state<string | null>(null); // null = all/edits, string = specific snapshot id
+  let pendingRevert = $state<{ blockId: string; content: string } | null>(null);
 
   // Get zone label for display
   const zoneLabel = $derived.by(() => {
@@ -49,6 +60,32 @@
   // Track if content is long enough to need expand
   const isContentLong = $derived(block ? block.content.length > 400 : false);
 
+  // Snapshot diff: compare block against latest snapshot
+  const snapshotDiff = $derived.by(() => {
+    if (!block || snapshots.length === 0) return null;
+    const latest = snapshots[snapshots.length - 1];
+    const snapBlock = latest.blocks.find((b) => b.id === block.id);
+    if (!snapBlock) return { status: "new" as const, changes: [] as string[], snapshotName: latest.name };
+    const changes: string[] = [];
+    if (block.content !== snapBlock.content) changes.push("content");
+    if (block.zone !== snapBlock.zone) {
+      const from = zonesStore.getZoneById(snapBlock.zone)?.label ?? snapBlock.zone;
+      const to = zonesStore.getZoneById(block.zone)?.label ?? block.zone;
+      changes.push(`zone: ${from} → ${to}`);
+    }
+    if (block.compressionLevel !== snapBlock.compressionLevel) {
+      changes.push(`compression: ${snapBlock.compressionLevel} → ${block.compressionLevel}`);
+    }
+    if (block.tokens !== snapBlock.tokens) {
+      const delta = block.tokens - snapBlock.tokens;
+      changes.push(`tokens: ${delta > 0 ? "+" : ""}${delta}`);
+    }
+    if (block.pinned !== snapBlock.pinned) changes.push("pin changed");
+    if (block.role !== snapBlock.role) changes.push(`role: ${snapBlock.role} → ${block.role}`);
+    if (changes.length === 0) return { status: "unchanged" as const, changes: [], snapshotName: latest.name };
+    return { status: "modified" as const, changes, snapshotName: latest.name };
+  });
+
   // Syntax highlighting for modal content (works in both view and edit modes)
   const modalDetectedLang = $derived(block ? detectLanguage(block.content, block.role) : null);
   const modalSyntaxHtml = $derived.by(() => {
@@ -57,14 +94,121 @@
     return highlightCode(text, modalDetectedLang);
   });
 
+  // Combined version timeline: edit history + snapshot versions
+  interface VersionEntry {
+    content: string;
+    label: string;
+    source: "edit" | "snapshot";
+    snapshotId: string | null; // null for edit history entries
+    timestamp: number;
+  }
+
+  // All versions (unfiltered)
+  const allVersions = $derived.by((): VersionEntry[] => {
+    if (!block) return [];
+    const versions: VersionEntry[] = [];
+
+    // From edit history (content changes only)
+    const history = editHistoryStore.getBlockHistory(block.id);
+    for (const entry of history) {
+      if (entry.type === "content" && entry.before.content != null) {
+        versions.push({
+          content: entry.before.content,
+          label: "Edit",
+          source: "edit",
+          snapshotId: null,
+          timestamp: entry.timestamp,
+        });
+      }
+    }
+
+    // From snapshots
+    for (const snap of snapshots) {
+      const snapBlock = snap.blocks.find((b) => b.id === block.id);
+      if (snapBlock) {
+        versions.push({
+          content: snapBlock.content,
+          label: snap.name,
+          source: "snapshot",
+          snapshotId: snap.id,
+          timestamp: new Date(snap.timestamp).getTime(),
+        });
+      }
+    }
+
+    // Sort newest first, deduplicate adjacent identical content
+    versions.sort((a, b) => b.timestamp - a.timestamp);
+    const deduped: VersionEntry[] = [];
+    let lastContent: string | null = null;
+    for (const v of versions) {
+      if (v.content !== lastContent) {
+        deduped.push(v);
+        lastContent = v.content;
+      }
+    }
+    return deduped;
+  });
+
+  // Snapshots that have versions for this block (for snapshot dropdown)
+  const availableSnapshotIds = $derived.by((): { id: string; name: string }[] => {
+    const seen = new Map<string, string>();
+    for (const v of allVersions) {
+      if (v.snapshotId && !seen.has(v.snapshotId)) {
+        seen.set(v.snapshotId, v.label);
+      }
+    }
+    return Array.from(seen, ([id, name]) => ({ id, name }));
+  });
+
+  // Filtered timeline: when snapshot is selected, only show that snapshot's versions
+  const versionTimeline = $derived.by((): VersionEntry[] => {
+    if (!diffSnapshotFilter) return allVersions;
+    return allVersions.filter(v => v.snapshotId === diffSnapshotFilter);
+  });
+
+  // Current snapshot filter label
+  const diffSnapshotLabel = $derived.by(() => {
+    if (!diffSnapshotFilter) return "All";
+    const snap = availableSnapshotIds.find(s => s.id === diffSnapshotFilter);
+    return snap?.name ?? "Unknown";
+  });
+
+  const hasVersions = $derived(allVersions.length > 0);
+  const hasEditHistory = $derived(block ? editHistoryStore.getBlockHistory(block.id).length > 0 : false);
+
+  // Current diff comparison (uses pending revert content if active)
+  const diffVersion = $derived(
+    versionTimeline.length > 0 && diffVersionIndex < versionTimeline.length
+      ? versionTimeline[diffVersionIndex]
+      : null
+  );
+
+  // The "current" content for diff — if a revert is pending, show the reverted content on the left
+  const effectiveBlockContent = $derived(
+    pendingRevert ? pendingRevert.content : (block?.content ?? "")
+  );
+
+  const diffResult = $derived.by((): DiffLine[] => {
+    if (!block || !diffVersion || !diffExpanded) return [];
+    return diffLines(diffVersion.content, effectiveBlockContent);
+  });
+
   // Reset state when modal opens/closes or block changes
   $effect(() => {
     if (!open) {
+      // Apply pending revert on close
+      if (pendingRevert && onRevert) {
+        onRevert(pendingRevert.blockId, pendingRevert.content);
+      }
       isEditing = false;
       isContentExpanded = false;
       editContent = "";
       roleDropdownOpen = false;
       zoneDropdownOpen = false;
+      diffExpanded = false;
+      diffVersionIndex = 0;
+      diffSnapshotFilter = null;
+      pendingRevert = null;
     }
   });
 
@@ -176,6 +320,7 @@
     <div
       class="modal"
       class:expanded={isContentExpanded}
+      class:diff-expanded={diffExpanded}
       style:--role-color={roleColors[block.role]}
     >
       <div class="modal-header">
@@ -262,50 +407,128 @@
         </div>
       </div>
 
-      <!-- svelte-ignore a11y_no_static_element_interactions -->
-      <div
-        class="modal-content"
-        class:editing={isEditing}
-        ondblclick={handleContentDoubleClick}
-      >
-        {#if isEditing}
-          <div class="edit-overlay-container">
-            {#if modalSyntaxHtml}
-              <pre class="edit-highlight-layer syntax-highlighted" aria-hidden="true">{@html modalSyntaxHtml}
+      <div class="modal-content-area" class:side-by-side={diffExpanded}>
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <div
+          class="modal-content"
+          class:editing={isEditing}
+          ondblclick={handleContentDoubleClick}
+        >
+          {#if isEditing}
+            <div class="edit-overlay-container">
+              {#if modalSyntaxHtml}
+                <pre class="edit-highlight-layer syntax-highlighted" aria-hidden="true">{@html modalSyntaxHtml}
 </pre>
-            {:else}
-              <pre class="edit-highlight-layer" aria-hidden="true">{editContent}
+              {:else}
+                <pre class="edit-highlight-layer" aria-hidden="true">{editContent}
 </pre>
+              {/if}
+              <textarea
+                bind:this={textareaRef}
+                bind:value={editContent}
+                class="edit-textarea-layer"
+                class:has-highlight={!!modalSyntaxHtml}
+                spellcheck="true"
+                lang="en"
+                autocomplete="off"
+                onkeydown={handleEditKeydown}
+                onscroll={(e) => {
+                  const target = e.currentTarget;
+                  const pre = target.previousElementSibling as HTMLElement;
+                  if (pre) {
+                    pre.scrollTop = target.scrollTop;
+                    pre.scrollLeft = target.scrollLeft;
+                  }
+                }}
+              ></textarea>
+            </div>
+          {:else if modalSyntaxHtml}
+            <pre class="syntax-highlighted">{@html modalSyntaxHtml}</pre>
+            {#if !isContentExpanded && isContentLong}
+              <div class="content-fade"></div>
             {/if}
-            <textarea
-              bind:this={textareaRef}
-              bind:value={editContent}
-              class="edit-textarea-layer"
-              class:has-highlight={!!modalSyntaxHtml}
-              spellcheck="true"
-              lang="en"
-              autocomplete="off"
-              onkeydown={handleEditKeydown}
-              onscroll={(e) => {
-                const target = e.currentTarget;
-                const pre = target.previousElementSibling as HTMLElement;
-                if (pre) {
-                  pre.scrollTop = target.scrollTop;
-                  pre.scrollLeft = target.scrollLeft;
-                }
-              }}
-            ></textarea>
+          {:else}
+            <pre>{isContentExpanded ? block.content : getPreview(block.content)}</pre>
+            {#if !isContentExpanded && isContentLong}
+              <div class="content-fade"></div>
+            {/if}
+          {/if}
+        </div>
+
+        {#if diffExpanded && diffVersion}
+          <div class="diff-divider"></div>
+          <div class="diff-panel">
+            <div class="diff-panel-header">
+              <div class="diff-version-info">
+                <span class="diff-version-label">{diffVersion.label}</span>
+                <span class="diff-source-badge diff-source-{diffVersion.source}">{diffVersion.source}</span>
+              </div>
+              <div class="diff-nav">
+                <!-- Snapshot filter dropdown -->
+                <select
+                  class="diff-snapshot-select"
+                  value={diffSnapshotFilter ?? ""}
+                  onchange={(e) => {
+                    const val = (e.currentTarget as HTMLSelectElement).value;
+                    diffSnapshotFilter = val || null;
+                    diffVersionIndex = 0;
+                  }}
+                >
+                  <option value="">All</option>
+                  {#each availableSnapshotIds as snap (snap.id)}
+                    <option value={snap.id}>{snap.name}</option>
+                  {/each}
+                </select>
+                <button
+                  class="diff-nav-btn"
+                  disabled={diffVersionIndex <= 0}
+                  onclick={() => diffVersionIndex = Math.max(diffVersionIndex - 1, 0)}
+                  title="Newer version"
+                >◀</button>
+                <span class="diff-nav-label">
+                  {diffVersionIndex + 1} / {versionTimeline.length}
+                </span>
+                <button
+                  class="diff-nav-btn"
+                  disabled={diffVersionIndex >= versionTimeline.length - 1}
+                  onclick={() => diffVersionIndex = Math.min(diffVersionIndex + 1, versionTimeline.length - 1)}
+                  title="Older version"
+                >▶</button>
+              </div>
+            </div>
+            {#if diffSnapshotFilter}
+              <div class="diff-snapshot-indicator">
+                Viewing: <strong>{diffSnapshotLabel}</strong>
+              </div>
+            {/if}
+            <div class="diff-panel-content">
+              {#each diffResult as line}
+                <div class="modal-diff-line modal-diff-line-{line.type}">
+                  <span class="modal-diff-marker">{line.type === "added" ? "+" : line.type === "removed" ? "-" : " "}</span>
+                  <span class="modal-diff-text">{line.content || " "}</span>
+                </div>
+              {/each}
+            </div>
+            {#if block}
+              <div class="diff-panel-footer">
+                {#if pendingRevert}
+                  <button
+                    class="revert-btn revert-undo"
+                    onclick={() => pendingRevert = null}
+                  >Undo Revert</button>
+                {:else}
+                  <button
+                    class="revert-btn"
+                    onclick={() => {
+                      if (block && diffVersion) {
+                        pendingRevert = { blockId: block.id, content: diffVersion.content };
+                      }
+                    }}
+                  >Revert to this version</button>
+                {/if}
+              </div>
+            {/if}
           </div>
-        {:else if modalSyntaxHtml}
-          <pre class="syntax-highlighted">{@html modalSyntaxHtml}</pre>
-          {#if !isContentExpanded && isContentLong}
-            <div class="content-fade"></div>
-          {/if}
-        {:else}
-          <pre>{isContentExpanded ? block.content : getPreview(block.content)}</pre>
-          {#if !isContentExpanded && isContentLong}
-            <div class="content-fade"></div>
-          {/if}
         {/if}
       </div>
 
@@ -355,6 +578,36 @@
             <button class:active={block.pinned === "bottom"} onclick={() => onPin?.(block?.pinned === "bottom" ? null : "bottom")}>Bottom</button>
           </div>
         </div>
+
+        {#if snapshotDiff || hasEditHistory}
+          <div class="action-group">
+            <span class="action-label">{snapshotDiff ? "Snapshot" : "History"}</span>
+            <div class="snapshot-diff-info">
+              {#if snapshotDiff}
+                {#if snapshotDiff.status === "new"}
+                  <span class="diff-badge diff-badge-new">New</span>
+                  <span class="diff-detail">Not in "{snapshotDiff.snapshotName}"</span>
+                {:else if snapshotDiff.status === "modified"}
+                  <span class="diff-badge diff-badge-modified">Modified</span>
+                  <span class="diff-detail">{snapshotDiff.changes.join(", ")}</span>
+                {:else}
+                  <span class="diff-badge diff-badge-unchanged">Unchanged</span>
+                {/if}
+              {:else if hasEditHistory}
+                <span class="diff-badge diff-badge-history">{versionTimeline.length} version{versionTimeline.length === 1 ? "" : "s"}</span>
+              {/if}
+              {#if hasVersions && !isEditing}
+                <button
+                  class="diff-view-btn"
+                  onclick={() => { diffExpanded = !diffExpanded; diffVersionIndex = 0; }}
+                >{diffExpanded ? "Hide Diff" : "Show Diff"}</button>
+              {/if}
+              {#if onOpenDiff}
+                <button class="diff-view-btn" onclick={() => onOpenDiff?.(block?.zone, block?.id)}>Full Diff</button>
+              {/if}
+            </div>
+          </div>
+        {/if}
 
         <div class="action-group action-danger">
           <button class="btn-danger" onclick={onRemove}>Remove Block</button>
@@ -909,5 +1162,310 @@
     background: var(--semantic-danger);
     border-color: var(--semantic-danger);
     color: var(--bg-surface);
+  }
+
+  /* Snapshot diff info */
+  .snapshot-diff-info {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .diff-badge {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    font-weight: 600;
+    padding: 2px 5px;
+    border-radius: 2px;
+    letter-spacing: 0.2px;
+    flex-shrink: 0;
+  }
+
+  .diff-badge-new {
+    color: var(--semantic-success);
+    background: color-mix(in srgb, var(--semantic-success) 15%, transparent);
+  }
+
+  .diff-badge-modified {
+    color: var(--semantic-warning);
+    background: color-mix(in srgb, var(--semantic-warning) 15%, transparent);
+  }
+
+  .diff-badge-unchanged {
+    color: var(--text-faint);
+    background: var(--bg-inset);
+  }
+
+  .diff-detail {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 200px;
+  }
+
+  .diff-view-btn {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    padding: 2px 6px;
+    border-radius: 2px;
+    border: 1px solid var(--border-default);
+    background: var(--bg-surface);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.1s ease;
+    margin-left: auto;
+    flex-shrink: 0;
+  }
+
+  .diff-view-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+    border-color: var(--border-strong);
+  }
+
+  .diff-badge-history {
+    color: var(--text-muted);
+    background: var(--bg-inset);
+  }
+
+  /* Diff expanded modal */
+  .modal.diff-expanded {
+    max-width: 1000px;
+    max-height: 90vh;
+  }
+
+  /* Side-by-side content area */
+  .modal-content-area {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .modal-content-area.side-by-side {
+    flex-direction: row;
+  }
+
+  .modal-content-area.side-by-side .modal-content {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .diff-divider {
+    width: 1px;
+    background: var(--border-default);
+    flex-shrink: 0;
+  }
+
+  /* Diff panel */
+  .diff-panel {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-base);
+    overflow: hidden;
+  }
+
+  .diff-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--border-subtle);
+    background: var(--bg-surface);
+    flex-shrink: 0;
+  }
+
+  .diff-version-info {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .diff-version-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-secondary);
+    font-weight: 600;
+  }
+
+  .diff-source-badge {
+    font-family: var(--font-mono);
+    font-size: 8px;
+    padding: 1px 4px;
+    border-radius: 2px;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+  }
+
+  .diff-source-edit {
+    color: var(--semantic-warning);
+    background: color-mix(in srgb, var(--semantic-warning) 15%, transparent);
+  }
+
+  .diff-source-snapshot {
+    color: var(--accent);
+    background: var(--accent-subtle);
+  }
+
+  .diff-nav {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .diff-nav-btn {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    padding: 2px 6px;
+    border: 1px solid var(--border-default);
+    border-radius: 2px;
+    background: var(--bg-surface);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.1s ease;
+  }
+
+  .diff-nav-btn:hover:not(:disabled) {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+    border-color: var(--border-strong);
+  }
+
+  .diff-nav-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+  }
+
+  .diff-nav-label {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--text-muted);
+    white-space: nowrap;
+    min-width: 60px;
+    text-align: center;
+  }
+
+  .diff-panel-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 0;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-default) transparent;
+  }
+
+  .modal-diff-line {
+    display: flex;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    line-height: 1.55;
+    min-height: 18px;
+    padding: 0 8px;
+  }
+
+  .modal-diff-line-added {
+    background: color-mix(in srgb, var(--semantic-success) 10%, transparent);
+  }
+
+  .modal-diff-line-removed {
+    background: color-mix(in srgb, var(--semantic-danger) 10%, transparent);
+    opacity: 0.7;
+  }
+
+  .modal-diff-line-unchanged {
+    color: var(--text-muted);
+  }
+
+  .modal-diff-marker {
+    width: 14px;
+    flex-shrink: 0;
+    text-align: center;
+    font-weight: 700;
+    user-select: none;
+  }
+
+  .modal-diff-line-added .modal-diff-marker { color: var(--semantic-success); }
+  .modal-diff-line-removed .modal-diff-marker { color: var(--semantic-danger); }
+  .modal-diff-line-unchanged .modal-diff-marker { color: var(--text-faint); }
+
+  .modal-diff-text {
+    flex: 1;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .diff-panel-footer {
+    padding: 8px 10px;
+    border-top: 1px solid var(--border-subtle);
+    background: var(--bg-surface);
+    flex-shrink: 0;
+  }
+
+  .revert-btn {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    padding: 4px 10px;
+    border-radius: 3px;
+    border: 1px solid color-mix(in srgb, var(--semantic-warning) 50%, transparent);
+    background: transparent;
+    color: var(--semantic-warning);
+    cursor: pointer;
+    transition: all 0.1s ease;
+    width: 100%;
+  }
+
+  .revert-btn:hover {
+    background: var(--semantic-warning);
+    border-color: var(--semantic-warning);
+    color: var(--bg-surface);
+  }
+
+  .revert-btn.revert-undo {
+    border-color: color-mix(in srgb, var(--semantic-danger) 50%, transparent);
+    color: var(--semantic-danger);
+  }
+
+  .revert-btn.revert-undo:hover {
+    background: var(--semantic-danger);
+    border-color: var(--semantic-danger);
+    color: var(--bg-surface);
+  }
+
+  /* Snapshot filter dropdown in diff nav */
+  .diff-snapshot-select {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    padding: 2px 4px;
+    background: var(--bg-base);
+    border: 1px solid var(--border-default);
+    border-radius: 2px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    color-scheme: dark;
+    max-width: 100px;
+  }
+
+  .diff-snapshot-select:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+
+  .diff-snapshot-indicator {
+    padding: 3px 10px;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--text-muted);
+    background: color-mix(in srgb, var(--accent) 8%, var(--bg-surface));
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .diff-snapshot-indicator strong {
+    color: var(--text-primary);
   }
 </style>
