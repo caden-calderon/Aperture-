@@ -150,11 +150,13 @@
     width: 100%;
     height: 100%;
     overflow: hidden;
+    /* Match xterm theme background so cell-grid gaps are invisible */
+    background: var(--bg-base);
   }
 
   /* Override xterm.js defaults to fill container */
   .terminal-container :global(.xterm) {
-    padding: 4px 4px 0 8px;
+    padding: 2px 0 0 4px;
     height: 100%;
   }
 

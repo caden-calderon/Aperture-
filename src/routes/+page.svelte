@@ -23,6 +23,10 @@
   let termResizeRaf = $state<number | null>(null);
   let terminalPanelRef = $state<HTMLElement | null>(null);
   let terminalPanelComponentRef = $state<ReturnType<typeof TerminalPanel> | null>(null);
+  let contentRef = $state<HTMLElement | null>(null);
+
+  // Minimum content area size before auto-collapsing context panel
+  const MIN_CONTENT_SIZE = 120;
 
   // Initialize stores on mount
   onMount(() => {
@@ -168,7 +172,23 @@
     isResizingTerminal = true;
     const isBottom = terminalStore.position === 'bottom';
     termResizeStart = isBottom ? e.clientY : e.clientX;
-    termResizeStartSize = isBottom ? terminalStore.terminalHeight : terminalStore.terminalWidth;
+
+    // When context is collapsed, terminal fills via flex — measure actual DOM size
+    if (uiStore.contextPanelCollapsed && terminalPanelRef) {
+      termResizeStartSize = isBottom
+        ? terminalPanelRef.clientHeight
+        : terminalPanelRef.clientWidth;
+      // Switch from flex fill to fixed size for smooth drag
+      if (isBottom) {
+        terminalPanelRef.style.height = `${termResizeStartSize}px`;
+      } else {
+        terminalPanelRef.style.width = `${termResizeStartSize}px`;
+      }
+      terminalPanelRef.style.flex = '0 0 auto';
+    } else {
+      termResizeStartSize = isBottom ? terminalStore.terminalHeight : terminalStore.terminalWidth;
+    }
+
     document.body.style.cursor = isBottom ? 'row-resize' : 'col-resize';
     document.body.style.userSelect = 'none';
     document.documentElement.classList.add('is-resizing');
@@ -197,8 +217,15 @@
   function handleTermResizeEnd() {
     if (!isResizingTerminal) return;
     if (termResizeRaf) cancelAnimationFrame(termResizeRaf);
+
+    const wasContextCollapsed = uiStore.contextPanelCollapsed;
+
     if (terminalPanelRef) {
       const isBottom = terminalStore.position === 'bottom';
+
+      // Reset flex override from collapsed-context drag
+      terminalPanelRef.style.flex = '';
+
       if (isBottom) {
         const finalHeight = parseInt(terminalPanelRef.style.height) || terminalStore.terminalHeight;
         terminalStore.setHeight(finalHeight);
@@ -209,6 +236,26 @@
         terminalPanelRef.style.width = `${terminalStore.terminalWidth}px`;
       }
     }
+
+    if (wasContextCollapsed) {
+      // Un-collapse context if terminal was dragged smaller, freeing enough space
+      const isBottom = terminalStore.position === 'bottom';
+      const freedSpace = termResizeStartSize - (isBottom ? terminalStore.terminalHeight : terminalStore.terminalWidth);
+      if (freedSpace >= MIN_CONTENT_SIZE) {
+        uiStore.toggleContextPanel();
+      }
+    } else if (contentRef) {
+      // Auto-collapse context if content area is too small
+      const isBottom = terminalStore.position === 'bottom';
+      const containerSize = isBottom ? contentRef.clientHeight : contentRef.clientWidth;
+      const termSize = isBottom ? terminalStore.terminalHeight : terminalStore.terminalWidth;
+      const handleSize = 4;
+      const remaining = containerSize - termSize - handleSize;
+      if (remaining < MIN_CONTENT_SIZE) {
+        uiStore.toggleContextPanel();
+      }
+    }
+
     isResizingTerminal = false;
     document.body.style.cursor = '';
     document.body.style.userSelect = '';
@@ -711,7 +758,7 @@
     </div>
 
     <!-- Content -->
-    <div class="content" class:content-right={terminalStore.isVisible && terminalStore.position === 'right'}>
+    <div class="content" class:content-right={terminalStore.isVisible && terminalStore.position === 'right'} bind:this={contentRef}>
       {#if uiStore.contextPanelCollapsed}
         <!-- Context panel collapsed bar -->
         <button class="context-collapsed" onclick={() => uiStore.toggleContextPanel()} title="Expand context panel">
@@ -799,15 +846,32 @@
           class:terminal-split-vertical={terminalStore.position === 'right'}
           class:active={isResizingTerminal}
           onmousedown={handleTermResizeStart}
-        ></div>
+        >
+          <button
+            class="terminal-toggle-btn"
+            class:terminal-toggle-vertical={terminalStore.position === 'right'}
+            title={terminalStore.isCollapsed ? "Expand terminal" : "Collapse terminal"}
+            onmousedown={(e) => e.stopPropagation()}
+            onclick={() => terminalStore.toggleCollapsed()}
+          >
+            {#if terminalStore.position === 'bottom'}
+              {terminalStore.isCollapsed ? "▴" : "▾"}
+            {:else}
+              {terminalStore.isCollapsed ? "‹" : "›"}
+            {/if}
+          </button>
+        </div>
 
         <div
           class="terminal-panel-wrapper"
           class:terminal-panel-right={terminalStore.position === 'right'}
+          class:terminal-fill={uiStore.contextPanelCollapsed}
           bind:this={terminalPanelRef}
-          style={terminalStore.position === 'bottom'
-            ? `height: ${terminalStore.terminalHeight}px`
-            : `width: ${terminalStore.terminalWidth}px`}
+          style={uiStore.contextPanelCollapsed
+            ? ''
+            : (terminalStore.position === 'bottom'
+              ? `height: ${terminalStore.terminalHeight}px`
+              : `width: ${terminalStore.terminalWidth}px`)}
         >
           <TerminalPanel bind:this={terminalPanelComponentRef} />
         </div>
@@ -1296,6 +1360,7 @@
     background: transparent;
     transition: background 0.15s ease;
     flex-shrink: 0;
+    position: relative;
   }
 
   .terminal-split-handle.terminal-split-vertical {
@@ -1309,6 +1374,46 @@
     background: var(--accent);
   }
 
+  /* Terminal toggle button on split handle — matches sidebar toggle size */
+  .terminal-toggle-btn {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 32px;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-mono);
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-muted);
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: 3px;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.15s ease, color 0.1s ease;
+    z-index: 5;
+    padding: 0;
+    line-height: 1;
+  }
+
+  .terminal-toggle-btn.terminal-toggle-vertical {
+    width: 16px;
+    height: 32px;
+  }
+
+  .terminal-split-handle:hover .terminal-toggle-btn {
+    opacity: 1;
+  }
+
+  .terminal-toggle-btn:hover {
+    color: var(--text-primary);
+    border-color: var(--accent);
+  }
+
   /* Terminal panel wrapper */
   .terminal-panel-wrapper {
     flex-shrink: 0;
@@ -1319,5 +1424,11 @@
 
   .terminal-panel-wrapper.terminal-panel-right {
     height: 100%;
+  }
+
+  .terminal-panel-wrapper.terminal-fill {
+    flex: 1;
+    min-height: 0;
+    min-width: 0;
   }
 </style>

@@ -291,7 +291,17 @@
       class:active={isResizing}
       onmousedown={(e) => { e.preventDefault(); e.stopPropagation(); onResizeStart?.(e, zoneContentRef?.scrollHeight); }}
     >
-      <div class="resize-grip-line"></div>
+      <!-- Grip pill: morphs from line → zone-colored pill with chevron on hover -->
+      <button
+        class="zone-grip-pill"
+        title="Collapse zone"
+        onmousedown={(e) => e.stopPropagation()}
+        onclick={onToggleCollapse}
+      >
+        <svg class="grip-chevron" width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+          <polyline points="4 6 8 10 12 6" />
+        </svg>
+      </button>
     </div>
   {/if}
 
@@ -483,23 +493,49 @@
     background: color-mix(in srgb, var(--zone-color) 25%, var(--bg-inset));
   }
 
-  .resize-grip-line {
+  /* Grip pill — morphs from subtle line to zone-colored pill with chevron */
+  .zone-grip-pill {
     width: 40px;
     height: 3px;
     background: var(--border-default);
+    border: none;
     border-radius: 2px;
-    transition: all 0.1s ease;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    overflow: hidden;
+    color: var(--bg-surface);
   }
 
-  .zone-resize-handle:hover .resize-grip-line {
-    background: var(--zone-color);
-    width: 60px;
+  .grip-chevron {
+    opacity: 0;
+    transition: opacity 0.12s ease;
+    flex-shrink: 0;
   }
 
-  .zone-resize-handle.active .resize-grip-line {
+  .zone-resize-handle:hover .zone-grip-pill {
+    width: 48px;
+    height: 16px;
     background: var(--zone-color);
+    border-radius: 8px;
+  }
+
+  .zone-resize-handle:hover .grip-chevron {
+    opacity: 1;
+  }
+
+  .zone-resize-handle.active .zone-grip-pill {
     width: 80px;
     height: 4px;
+    background: var(--zone-color);
+    border-radius: 2px;
+  }
+
+  .zone-resize-handle.active .grip-chevron {
+    opacity: 0;
   }
 
   @keyframes zone-expand {

@@ -761,6 +761,26 @@ make test-ui     # Frontend tests
 
 ---
 
+### 2026-02-06: Resize Handle Polish + Terminal Border Fix
+
+**Completed:**
+- [x] **Zone grip pill redesign** — Grip line morphs into zone-colored pill with chevron on hover. Single cohesive element replaces separate grip line + overlay button. Default: 40×3px subtle line → Hover: 48×16px pill with ▾ chevron → Active: 80×4px drag line. Uses `var(--zone-color)` so each zone's pill matches its assigned color.
+- [x] **Terminal toggle buttons sized to sidebar** — Horizontal: 32×16px, Vertical: 16×32px, font 14px. Matches sidebar's `‹`/`›` button dimensions.
+- [x] **Terminal pre-collapse tracking** — `preCollapseHeight`/`preCollapseWidth` saved before snap-to-collapse. `expandFromCollapsed()` restores previous size instead of hardcoded defaults. Added `collapseTerminal()`, `toggleCollapsed()` to store API.
+- [x] **Sticky collapse for context panel** — Dragging terminal to fill auto-collapses context panel when remaining space < 120px.
+- [x] **Drag to un-collapse context** — When context is collapsed and terminal fills, dragging the split handle down measures freed space. If ≥ 120px freed, context un-collapses. Switches terminal from flex fill to fixed size on drag start for smooth resize.
+- [x] **Terminal fills when context collapsed** — `terminal-fill` CSS class applies `flex: 1` to terminal wrapper when context panel is collapsed. No wasted space.
+- [x] **Terminal black border eliminated** — Set `background: var(--bg-base)` on `.terminal-container` and `.terminal-body` so xterm cell-grid edge gaps are invisible. Reduced padding to minimal `2px 0 0 4px`.
+
+**Files Changed:**
+- `src/lib/components/Zone.svelte` — Grip pill redesign (HTML + CSS)
+- `src/lib/components/Terminal.svelte` — Background fix, padding reduction
+- `src/lib/components/TerminalPanel.svelte` — terminal-body background, use store expandFromCollapsed
+- `src/lib/stores/terminal.svelte.ts` — preCollapse tracking, collapse/expand/toggle functions
+- `src/routes/+page.svelte` — Terminal toggle btn sizing, drag-to-uncollapse, auto-collapse, terminal-fill class
+
+---
+
 ### Next Session TODO
 
 - [ ] Test all features in `npm run tauri dev` (full desktop app)

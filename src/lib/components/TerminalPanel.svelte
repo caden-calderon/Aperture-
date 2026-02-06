@@ -29,12 +29,7 @@
   }
 
   function handleExpandFromCollapsed() {
-    const isBottom = terminalStore.position === 'bottom';
-    if (isBottom) {
-      terminalStore.setHeight(300);
-    } else {
-      terminalStore.setWidth(400);
-    }
+    terminalStore.expandFromCollapsed();
   }
 </script>
 
@@ -226,5 +221,7 @@
     flex: 1;
     overflow: hidden;
     min-height: 0;
+    /* Match xterm theme background so cell-grid edge gaps are invisible */
+    background: var(--bg-base);
   }
 </style>

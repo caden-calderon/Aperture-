@@ -18,6 +18,8 @@ let terminalHeight = $state(300);
 let terminalWidth = $state(400);
 let position = $state<TerminalPosition>('bottom');
 let isExited = $state(false);
+let preCollapseHeight = $state(300);
+let preCollapseWidth = $state(400);
 
 // ============================================================================
 // Persistence Keys
@@ -56,6 +58,10 @@ const MIN_USABLE_WIDTH = 180;
 function setHeight(px: number): void {
   // Snap to collapsed if below minimum usable size
   if (px < MIN_USABLE_HEIGHT) {
+    // Save current height before collapsing (only if currently expanded)
+    if (terminalHeight >= MIN_USABLE_HEIGHT) {
+      preCollapseHeight = terminalHeight;
+    }
     terminalHeight = COLLAPSED_SIZE;
   } else {
     terminalHeight = px;
@@ -65,11 +71,39 @@ function setHeight(px: number): void {
 
 function setWidth(px: number): void {
   if (px < MIN_USABLE_WIDTH) {
+    if (terminalWidth >= MIN_USABLE_WIDTH) {
+      preCollapseWidth = terminalWidth;
+    }
     terminalWidth = COLLAPSED_SIZE;
   } else {
     terminalWidth = px;
   }
   saveWidth();
+}
+
+function collapseTerminal(): void {
+  if (position === 'bottom') {
+    setHeight(0); // Triggers snap to COLLAPSED_SIZE
+  } else {
+    setWidth(0);
+  }
+}
+
+function expandFromCollapsed(): void {
+  if (position === 'bottom') {
+    setHeight(preCollapseHeight);
+  } else {
+    setWidth(preCollapseWidth);
+  }
+}
+
+function toggleCollapsed(): void {
+  const size = position === 'bottom' ? terminalHeight : terminalWidth;
+  if (size <= COLLAPSED_SIZE) {
+    expandFromCollapsed();
+  } else {
+    collapseTerminal();
+  }
 }
 
 function setPosition(pos: TerminalPosition): void {
@@ -160,4 +194,7 @@ export const terminalStore = {
   togglePosition,
   setSessionId,
   setExited,
+  collapseTerminal,
+  expandFromCollapsed,
+  toggleCollapsed,
 };
