@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { TokenBudgetBar, Zone, Modal, Toast, CommandPalette, ThemeToggle, DensityControl, TitleBar, ThemeCustomizer, BlockTypeManager, ZoneManager, SearchBar, TerminalPanel } from "$lib/components";
+  import { TokenBudgetBar, Zone, Modal, Toast, CommandPalette, ThemeToggle, DensityControl, TitleBar, ThemeCustomizer, BlockTypeManager, ZoneManager, SearchBar, TerminalPanel, ContextMenu } from "$lib/components";
   import { contextStore, selectionStore, uiStore, themeStore, blockTypesStore, zonesStore, searchStore, terminalStore } from "$lib/stores";
   import type { Zone as ZoneType, Block } from "$lib/types";
 
@@ -24,6 +24,12 @@
   let terminalPanelRef = $state<HTMLElement | null>(null);
   let terminalPanelComponentRef = $state<ReturnType<typeof TerminalPanel> | null>(null);
   let contentRef = $state<HTMLElement | null>(null);
+
+  // Context menu state
+  let contextMenuBlock = $state<string | null>(null);
+  let contextMenuX = $state(0);
+  let contextMenuY = $state(0);
+  let contextMenuVisible = $state(false);
 
   // Minimum content area size before auto-collapsing context panel
   const MIN_CONTENT_SIZE = 120;
@@ -262,6 +268,32 @@
     document.documentElement.classList.remove('is-resizing');
   }
 
+  // Flat ordered list of all visible blocks (zone display order)
+  const allBlocksFlat = $derived(
+    zonesStore.zonesByDisplayOrder.flatMap(z => contextStore.blocksByZone[z.id] ?? [])
+  );
+
+  // Navigate blocks with keyboard (J/K/Arrow)
+  function navigateBlock(direction: 'up' | 'down'): void {
+    const flat = allBlocksFlat;
+    if (flat.length === 0) return;
+
+    const currentFocused = selectionStore.focusedId;
+    const currentIdx = currentFocused ? flat.findIndex(b => b.id === currentFocused) : -1;
+
+    let nextIdx: number;
+    if (currentIdx === -1) {
+      // No current focus — start from first or last
+      nextIdx = direction === 'down' ? 0 : flat.length - 1;
+    } else {
+      nextIdx = direction === 'down' ? currentIdx + 1 : currentIdx - 1;
+    }
+
+    // Clamp to bounds
+    if (nextIdx < 0 || nextIdx >= flat.length) return;
+    selectionStore.focus(flat[nextIdx].id);
+  }
+
   // Keyboard shortcuts
   function handleKeydown(e: KeyboardEvent) {
     // Ctrl+T toggles terminal, even from inputs
@@ -343,12 +375,35 @@
         if (e.ctrlKey || e.metaKey) {
           e.preventDefault();
           uiStore.toggleCommandPalette();
+        } else {
+          e.preventDefault();
+          navigateBlock('up');
         }
         break;
       case "[":
         if (e.ctrlKey || e.metaKey) {
           e.preventDefault();
           uiStore.toggleSidebar();
+        }
+        break;
+      case "j":
+        if (!e.ctrlKey && !e.metaKey) {
+          e.preventDefault();
+          navigateBlock('down');
+        }
+        break;
+      case "arrowdown":
+        e.preventDefault();
+        navigateBlock('down');
+        break;
+      case "arrowup":
+        e.preventDefault();
+        navigateBlock('up');
+        break;
+      case "enter":
+        if (selectionStore.focusedId) {
+          e.preventDefault();
+          uiStore.openModal(selectionStore.focusedId);
         }
         break;
     }
@@ -369,6 +424,23 @@
 
   function handleBlockDragEnd() {
     uiStore.endDrag();
+  }
+
+  function handleBlockContextMenu(id: string, e: MouseEvent) {
+    e.preventDefault();
+    contextMenuBlock = id;
+    contextMenuX = e.clientX;
+    contextMenuY = e.clientY;
+    contextMenuVisible = true;
+    // Select the block if not already selected
+    if (!selectionStore.selectedIds.has(id)) {
+      selectionStore.select(id);
+    }
+  }
+
+  function closeContextMenu() {
+    contextMenuVisible = false;
+    contextMenuBlock = null;
   }
 
   function handleZoneDrop(zone: ZoneType, blockIds: string[]) {
@@ -729,6 +801,9 @@
         <section class="sidebar-section sidebar-grow">
           <h3 class="sidebar-heading">Shortcuts</h3>
           <div class="shortcuts">
+            <div class="shortcut"><kbd>J/K</kbd> Navigate</div>
+            <div class="shortcut"><kbd>↑/↓</kbd> Navigate</div>
+            <div class="shortcut"><kbd>Enter</kbd> Open block</div>
             <div class="shortcut"><kbd>A</kbd> Select all</div>
             <div class="shortcut"><kbd>Esc</kbd> Deselect</div>
             <div class="shortcut"><kbd>Del</kbd> Remove</div>
@@ -810,30 +885,69 @@
 
           <!-- Zones -->
           <div class="zones" class:resizing={resizingZoneId !== null}>
-            {#each zonesStore.zonesByDisplayOrder as zoneConfig (zoneConfig.id)}
-              <Zone
-                zone={zoneConfig.id as ZoneType}
-                blocks={contextStore.blocksByZone[zoneConfig.id] ?? []}
-                collapsed={uiStore.isZoneCollapsed(zoneConfig.id)}
-                selectedIds={selectionStore.selectedIds}
-                draggingBlockIds={uiStore.draggingBlockIds}
-                height={zonesStore.getZoneHeight(zoneConfig.id)}
-                expanded={zonesStore.isZoneExpanded(zoneConfig.id)}
-                contentExpanded={zonesStore.isContentExpanded(zoneConfig.id)}
-                isResizing={resizingZoneId === zoneConfig.id}
-                onToggleCollapse={() => handleToggleZoneCollapse(zoneConfig.id as ZoneType)}
-                onToggleExpanded={() => { if (!resizingZoneId) zonesStore.toggleZoneExpanded(zoneConfig.id); }}
-                onToggleContentExpanded={() => zonesStore.toggleContentExpanded(zoneConfig.id)}
-                onBlockSelect={handleBlockSelect}
-                onBlockDoubleClick={handleBlockDoubleClick}
-                onBlockDragStart={handleBlockDragStart}
-                onBlockDragEnd={handleBlockDragEnd}
-                onDrop={handleZoneDrop}
-                onCreateBlock={handleCreateBlock}
-                onReorder={handleZoneReorder}
-                onResizeStart={(e, h) => handleZoneResizeStart(e, zoneConfig.id, h)}
-              />
-            {/each}
+            {#if contextStore.blocks.length === 0}
+              <div class="empty-state">
+                <div class="empty-icon">
+                  <svg width="48" height="48" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="6" y="6" width="36" height="36" rx="4" />
+                    <line x1="6" y1="18" x2="42" y2="18" />
+                    <line x1="6" y1="30" x2="42" y2="30" />
+                    <line x1="18" y1="6" x2="18" y2="42" />
+                  </svg>
+                </div>
+                <h2 class="empty-title">No context blocks</h2>
+                <p class="empty-description">
+                  Connect to the proxy to capture live conversation data,
+                  or load demo blocks to explore the interface.
+                </p>
+                <div class="empty-actions">
+                  <button class="btn" onclick={() => contextStore.loadDemoData()}>
+                    Load Demo Data
+                  </button>
+                  <button class="btn" onclick={() => uiStore.toggleCommandPalette()}>
+                    Open Commands <kbd>⌘K</kbd>
+                  </button>
+                </div>
+                <div class="empty-hints">
+                  <div class="empty-hint">
+                    <kbd>J</kbd>/<kbd>K</kbd> Navigate blocks
+                  </div>
+                  <div class="empty-hint">
+                    <kbd>Enter</kbd> Open block details
+                  </div>
+                  <div class="empty-hint">
+                    <kbd>⌃T</kbd> Toggle terminal
+                  </div>
+                </div>
+              </div>
+            {:else}
+              {#each zonesStore.zonesByDisplayOrder as zoneConfig (zoneConfig.id)}
+                <Zone
+                  zone={zoneConfig.id as ZoneType}
+                  blocks={contextStore.blocksByZone[zoneConfig.id] ?? []}
+                  collapsed={uiStore.isZoneCollapsed(zoneConfig.id)}
+                  selectedIds={selectionStore.selectedIds}
+                  focusedBlockId={selectionStore.focusedId}
+                  draggingBlockIds={uiStore.draggingBlockIds}
+                  height={zonesStore.getZoneHeight(zoneConfig.id)}
+                  expanded={zonesStore.isZoneExpanded(zoneConfig.id)}
+                  contentExpanded={zonesStore.isContentExpanded(zoneConfig.id)}
+                  isResizing={resizingZoneId === zoneConfig.id}
+                  onToggleCollapse={() => handleToggleZoneCollapse(zoneConfig.id as ZoneType)}
+                  onToggleExpanded={() => { if (!resizingZoneId) zonesStore.toggleZoneExpanded(zoneConfig.id); }}
+                  onToggleContentExpanded={() => zonesStore.toggleContentExpanded(zoneConfig.id)}
+                  onBlockSelect={handleBlockSelect}
+                  onBlockDoubleClick={handleBlockDoubleClick}
+                  onBlockContextMenu={handleBlockContextMenu}
+                  onBlockDragStart={handleBlockDragStart}
+                  onBlockDragEnd={handleBlockDragEnd}
+                  onDrop={handleZoneDrop}
+                  onCreateBlock={handleCreateBlock}
+                  onReorder={handleZoneReorder}
+                  onResizeStart={(e, h) => handleZoneResizeStart(e, zoneConfig.id, h)}
+                />
+              {/each}
+            {/if}
           </div>
         </div>
       {/if}
@@ -901,6 +1015,55 @@
   open={uiStore.commandPaletteOpen}
   onClose={() => uiStore.toggleCommandPalette()}
   onCommand={handleCommand}
+/>
+
+<!-- Context Menu (right-click) -->
+<ContextMenu
+  block={contextMenuBlock ? contextStore.getBlock(contextMenuBlock) ?? null : null}
+  x={contextMenuX}
+  y={contextMenuY}
+  visible={contextMenuVisible}
+  onClose={closeContextMenu}
+  onPin={(pos: "top" | "bottom" | null) => {
+    if (contextMenuBlock) {
+      contextStore.pinBlock(contextMenuBlock, pos);
+      const label = pos ? `Pinned to ${pos}` : 'Unpinned';
+      uiStore.showToast(label, 'success');
+    }
+  }}
+  onMove={(zone: ZoneType) => {
+    if (contextMenuBlock) {
+      contextStore.moveBlock(contextMenuBlock, zone);
+      const zoneName = zonesStore.getZoneById(zone)?.label ?? zone;
+      uiStore.showToast(`Moved to ${zoneName}`, 'info');
+    }
+  }}
+  onCompress={(level: Block["compressionLevel"]) => {
+    if (contextMenuBlock) {
+      contextStore.setCompressionLevel(contextMenuBlock, level);
+      uiStore.showToast(`Set to ${level}`, 'success');
+    }
+  }}
+  onCopy={() => {
+    if (contextMenuBlock) {
+      const block = contextStore.getBlock(contextMenuBlock);
+      if (block) {
+        navigator.clipboard.writeText(block.content);
+        uiStore.showToast('Copied to clipboard', 'success');
+      }
+    }
+  }}
+  onRemove={() => {
+    if (contextMenuBlock) {
+      contextStore.removeBlock(contextMenuBlock);
+      uiStore.showToast('Block removed', 'success');
+    }
+  }}
+  onOpen={() => {
+    if (contextMenuBlock) {
+      uiStore.openModal(contextMenuBlock);
+    }
+  }}
 />
 
 <style>
@@ -1351,6 +1514,63 @@
   .zones.resizing {
     user-select: none;
     cursor: row-resize;
+  }
+
+  /* Empty state */
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    padding: var(--space-xl, 32px);
+    text-align: center;
+    gap: 12px;
+    min-height: 300px;
+  }
+
+  .empty-icon {
+    color: var(--text-faint);
+    opacity: 0.5;
+    margin-bottom: 4px;
+  }
+
+  .empty-title {
+    font-family: var(--font-display);
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin: 0;
+  }
+
+  .empty-description {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-muted);
+    max-width: 340px;
+    line-height: 1.5;
+    margin: 0;
+  }
+
+  .empty-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+  }
+
+  .empty-hints {
+    display: flex;
+    gap: 16px;
+    margin-top: 12px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-faint);
+  }
+
+  .empty-hint {
+    display: flex;
+    align-items: center;
+    gap: 4px;
   }
 
   /* Terminal split handle */

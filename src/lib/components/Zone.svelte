@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Block, Zone as ZoneType } from "$lib/types";
   import { contextStore, zonesStore } from "$lib/stores";
+  import { slide } from "svelte/transition";
   import ContextBlock from "./ContextBlock.svelte";
 
   interface Props {
@@ -8,6 +9,7 @@
     blocks: Block[];
     collapsed?: boolean;
     selectedIds?: Set<string>;
+    focusedBlockId?: string | null;
     draggingBlockIds?: string[];
     height?: number;
     expanded?: boolean;
@@ -18,6 +20,7 @@
     onToggleContentExpanded?: () => void;
     onBlockSelect?: (id: string, event: { shiftKey: boolean; ctrlKey: boolean; metaKey: boolean }) => void;
     onBlockDoubleClick?: (id: string) => void;
+    onBlockContextMenu?: (id: string, e: MouseEvent) => void;
     onBlockDragStart?: (ids: string[]) => void;
     onBlockDragEnd?: () => void;
     onDrop?: (zone: ZoneType, blockIds: string[]) => void;
@@ -31,6 +34,7 @@
     blocks,
     collapsed = false,
     selectedIds = new Set<string>(),
+    focusedBlockId = null,
     draggingBlockIds = [],
     height,
     expanded = false,
@@ -41,6 +45,7 @@
     onToggleContentExpanded,
     onBlockSelect,
     onBlockDoubleClick,
+    onBlockContextMenu,
     onBlockDragStart,
     onBlockDragEnd,
     onDrop,
@@ -80,6 +85,51 @@
   });
   let totalTokens = $derived(blocks.reduce((sum, b) => sum + b.tokens, 0));
   let selectedInZone = $derived(blocks.filter((b) => selectedIds.has(b.id)));
+
+  // Thread grouping: group consecutive blocks into conversation threads.
+  // A thread starts at a "user" block and includes all following non-user blocks.
+  // Returns a map of block ID → thread position for rendering the vertical line.
+  type ThreadPos = 'first' | 'middle' | 'last';
+  const threadPositions = $derived.by(() => {
+    const positions = new Map<string, ThreadPos>();
+    // Build thread groups
+    const groups: number[][] = [];
+    let currentGroup: number[] = [];
+
+    for (let i = 0; i < blocks.length; i++) {
+      const current = blocks[i];
+      const next = i < blocks.length - 1 ? blocks[i + 1] : null;
+
+      currentGroup.push(i);
+
+      // Check if next block continues the thread
+      const continues = next && (
+        (current.role === "user" && (next.role === "assistant" || next.role === "tool_use" || next.role === "tool_result")) ||
+        (current.role === "assistant" && (next.role === "tool_use" || next.role === "tool_result" || next.role === "assistant")) ||
+        (current.role === "tool_use" && (next.role === "tool_result" || next.role === "tool_use")) ||
+        (current.role === "tool_result" && (next.role === "tool_use" || next.role === "assistant"))
+      );
+
+      if (!continues) {
+        if (currentGroup.length > 1) {
+          groups.push(currentGroup);
+        }
+        currentGroup = [];
+      }
+    }
+
+    // Assign positions
+    for (const group of groups) {
+      for (let j = 0; j < group.length; j++) {
+        const idx = group[j];
+        if (j === 0) positions.set(blocks[idx].id, 'first');
+        else if (j === group.length - 1) positions.set(blocks[idx].id, 'last');
+        else positions.set(blocks[idx].id, 'middle');
+      }
+    }
+
+    return positions;
+  });
 
   function formatTokens(n: number): string {
     if (n >= 1000) return (n / 1000).toFixed(1) + "k";
@@ -267,17 +317,27 @@
           {#if dropInsertIndex === index && isDragOver}
             <div class="drop-line"></div>
           {/if}
-          <ContextBlock
-            {block}
-            selected={selectedIds.has(block.id)}
-            dragging={draggingBlockIds.includes(block.id)}
-            {contentExpanded}
-            {selectedIds}
-            onSelect={onBlockSelect}
-            onDoubleClick={onBlockDoubleClick}
-            onDragStart={onBlockDragStart}
-            onDragEnd={onBlockDragEnd}
-          />
+          <div
+            class="thread-wrapper"
+            class:thread-first={threadPositions.get(block.id) === 'first'}
+            class:thread-middle={threadPositions.get(block.id) === 'middle'}
+            class:thread-last={threadPositions.get(block.id) === 'last'}
+            transition:slide={{ duration: 150 }}
+          >
+            <ContextBlock
+              {block}
+              selected={selectedIds.has(block.id)}
+              focused={focusedBlockId === block.id}
+              dragging={draggingBlockIds.includes(block.id)}
+              {contentExpanded}
+              {selectedIds}
+              onSelect={onBlockSelect}
+              onDoubleClick={onBlockDoubleClick}
+              onContextMenu={onBlockContextMenu}
+              onDragStart={onBlockDragStart}
+              onDragEnd={onBlockDragEnd}
+            />
+          </div>
         {/each}
         {#if dropInsertIndex === blocks.length && isDragOver}
           <div class="drop-line"></div>
@@ -547,6 +607,71 @@
       opacity: 1;
       transform: translateY(0);
     }
+  }
+
+  /* Thread wrapper: vertical line + stems connecting related blocks */
+  .thread-wrapper {
+    position: relative;
+  }
+
+  /* Indent subsequent blocks in a thread */
+  .thread-wrapper.thread-middle,
+  .thread-wrapper.thread-last {
+    padding-left: 14px;
+  }
+
+  /* Vertical thread line — continuous 2px line on left side */
+  .thread-wrapper.thread-first::before,
+  .thread-wrapper.thread-middle::before,
+  .thread-wrapper.thread-last::before {
+    content: "";
+    position: absolute;
+    left: -6px;
+    width: 2px;
+    background: var(--border-default);
+    border-radius: 1px;
+    z-index: 1;
+  }
+
+  .thread-wrapper.thread-first::before {
+    top: 50%;
+    bottom: calc(-1 * (4px * var(--density-scale, 1)) - 1px);
+  }
+
+  .thread-wrapper.thread-middle::before {
+    top: -1px;
+    bottom: calc(-1 * (4px * var(--density-scale, 1)) - 1px);
+  }
+
+  .thread-wrapper.thread-last::before {
+    top: -1px;
+    bottom: 50%;
+  }
+
+  /* Horizontal stems — short legs from vertical line to each block */
+  .thread-wrapper.thread-first::after,
+  .thread-wrapper.thread-middle::after,
+  .thread-wrapper.thread-last::after {
+    content: "";
+    position: absolute;
+    left: -6px;
+    top: 50%;
+    height: 2px;
+    background: var(--border-default);
+    border-radius: 1px;
+    z-index: 1;
+    transform: translateY(-1px);
+  }
+
+  /* First block: short stem (line to block edge) */
+  .thread-wrapper.thread-first::after {
+    width: 6px;
+  }
+
+  /* Indented blocks: longer stem (line to indented block edge) */
+  .thread-wrapper.thread-middle::after,
+  .thread-wrapper.thread-last::after {
+    width: 20px;
   }
 
   .zone-empty {

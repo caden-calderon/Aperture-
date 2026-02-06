@@ -539,3 +539,63 @@ html.is-resizing * {
 .transition-all {
   transition: all 0.15s ease;
 }
+
+/* ============================================================================
+   Prism.js Syntax Highlighting — Theme-aware, uses CSS variables
+   ============================================================================ */
+
+.syntax-highlighted .token.comment,
+.syntax-highlighted .token.prolog,
+.syntax-highlighted .token.doctype,
+.syntax-highlighted .token.cdata {
+  color: var(--text-faint);
+  font-style: italic;
+}
+
+.syntax-highlighted .token.punctuation {
+  color: var(--text-muted);
+}
+
+.syntax-highlighted .token.property,
+.syntax-highlighted .token.tag,
+.syntax-highlighted .token.boolean,
+.syntax-highlighted .token.number,
+.syntax-highlighted .token.constant,
+.syntax-highlighted .token.symbol {
+  color: var(--role-tool);
+}
+
+.syntax-highlighted .token.selector,
+.syntax-highlighted .token.attr-name,
+.syntax-highlighted .token.string,
+.syntax-highlighted .token.char,
+.syntax-highlighted .token.inserted {
+  color: var(--role-assistant);
+}
+
+.syntax-highlighted .token.operator,
+.syntax-highlighted .token.entity,
+.syntax-highlighted .token.url {
+  color: var(--text-secondary);
+}
+
+.syntax-highlighted .token.atrule,
+.syntax-highlighted .token.attr-value,
+.syntax-highlighted .token.keyword {
+  color: var(--role-system);
+}
+
+.syntax-highlighted .token.function,
+.syntax-highlighted .token.class-name {
+  color: var(--role-user);
+}
+
+.syntax-highlighted .token.regex,
+.syntax-highlighted .token.important,
+.syntax-highlighted .token.variable {
+  color: var(--semantic-warning);
+}
+
+.syntax-highlighted .token.deleted {
+  color: var(--semantic-danger);
+}

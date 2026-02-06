@@ -2,15 +2,18 @@
   import type { Block } from "$lib/types";
   import { blockTypesStore } from "$lib/stores";
   import { searchStore, type SearchMatch } from "$lib/stores/search.svelte";
+  import { detectLanguage, highlightCode } from "$lib/utils/syntax";
 
   interface Props {
     block: Block;
     selected?: boolean;
+    focused?: boolean;
     dragging?: boolean;
     contentExpanded?: boolean;
     selectedIds?: Set<string>;
     onSelect?: (id: string, event: { shiftKey: boolean; ctrlKey: boolean; metaKey: boolean }) => void;
     onDoubleClick?: (id: string) => void;
+    onContextMenu?: (id: string, e: MouseEvent) => void;
     onDragStart?: (ids: string[]) => void;
     onDragEnd?: () => void;
   }
@@ -18,11 +21,13 @@
   let {
     block,
     selected = false,
+    focused = false,
     dragging = false,
     contentExpanded = false,
     selectedIds = new Set<string>(),
     onSelect,
     onDoubleClick,
+    onContextMenu,
     onDragStart,
     onDragEnd,
   }: Props = $props();
@@ -64,11 +69,19 @@
   const blockMatches = $derived(searchStore.isOpen ? searchStore.getBlockMatches(block.id) : []);
   const isCurrentMatch = $derived(searchStore.isOpen && searchStore.isCurrentMatchBlock(block.id));
   const currentBlockMatch = $derived(searchStore.getCurrentMatchForBlock(block.id));
+
+  // Syntax highlighting (disabled when search is active)
+  const detectedLang = $derived(detectLanguage(block.content, block.role));
+  const syntaxHtml = $derived.by(() => {
+    if (!detectedLang || blockMatches.length > 0) return null;
+    const text = showFullContent ? block.content : getPreview(block.content);
+    return highlightCode(text, detectedLang);
+  });
   let blockEl = $state<HTMLElement | null>(null);
 
-  // Scroll into view when this block is the current match
+  // Scroll into view when this block is the current match or keyboard-focused
   $effect(() => {
-    if (isCurrentMatch && blockEl) {
+    if ((isCurrentMatch || focused) && blockEl) {
       blockEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
   });
@@ -121,6 +134,10 @@
 
   function handleDoubleClick() {
     onDoubleClick?.(block.id);
+  }
+
+  function handleContextMenu(e: MouseEvent) {
+    onContextMenu?.(block.id, e);
   }
 
   function handleDragStart(e: DragEvent) {
@@ -183,6 +200,7 @@
 <div
   class="block"
   class:selected
+  class:focused
   class:dragging
   class:collapsed={isCollapsed}
   class:pinned={block.pinned !== null}
@@ -195,6 +213,7 @@
   draggable="true"
   onclick={handleClick}
   ondblclick={handleDoubleClick}
+  oncontextmenu={handleContextMenu}
   ondragstart={handleDragStart}
   ondragend={handleDragEnd}
   onkeydown={(e) => {
@@ -214,6 +233,9 @@
     {#if block.metadata.toolName}
       <span class="tool-name">{block.metadata.toolName}</span>
     {/if}
+    {#if detectedLang}
+      <span class="lang-badge">{detectedLang}</span>
+    {/if}
     <span class="token-count">{formatTokens(block.tokens)}</span>
     <button
       class="collapse-toggle"
@@ -232,6 +254,8 @@
           blockMatches.filter(m => showFullContent || m.startPos < 180),
           currentBlockMatch
         )}</pre>
+      {:else if syntaxHtml}
+        <pre class="syntax-highlighted" bind:this={preRef}>{@html syntaxHtml}</pre>
       {:else}
         <pre bind:this={preRef}>{showFullContent ? block.content : getPreview(block.content)}</pre>
       {/if}
@@ -290,6 +314,11 @@
     border-color: var(--accent);
     background: var(--accent-subtle);
     box-shadow: inset 0 0 0 1px var(--accent);
+  }
+
+  .block.focused {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
   }
 
   .block.dragging {
@@ -359,6 +388,18 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .lang-badge {
+    font-family: var(--font-mono);
+    font-size: calc(9px * var(--density-scale, 1));
+    font-weight: 600;
+    padding: 2px 5px;
+    border-radius: 2px;
+    background: color-mix(in srgb, var(--role-user) 15%, transparent);
+    color: var(--role-user);
+    letter-spacing: 0.3px;
+    text-transform: lowercase;
   }
 
   .token-count {

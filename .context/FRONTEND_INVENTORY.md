@@ -5,15 +5,15 @@
 
 ---
 
-## Components (16 total)
+## Components (17 total + 1 utility module)
 
 | Component | Location | Purpose | Backend Needs |
 |-----------|----------|---------|---------------|
-| `TitleBar` | `components/TitleBar.svelte` | Custom Tauri window title bar (−, □, ×) | None (Tauri native) |
+| `TitleBar` | `components/TitleBar.svelte` | Custom Tauri window title bar (−, □, ×) + status dropdown from "Aperture" text | None (Tauri native) |
 | `TokenBudgetBar` | `components/TokenBudgetBar.svelte` | Token usage bar with canvas halftone | Real token counts from proxy |
-| `Zone` | `components/Zone.svelte` | Collapsible zone container, resize handle with grip pill, drag-drop | Block data from context engine |
-| `ContextBlock` | `components/ContextBlock.svelte` | Individual block with per-block collapse, content expand, compact drag ghost | Block data, compression levels |
-| `Modal` | `components/Modal.svelte` | Block detail view/edit with role dropdown, zone selector, expandable content | Block CRUD operations |
+| `Zone` | `components/Zone.svelte` | Collapsible zone container, resize, drag-drop, thread lines, slide transitions | Block data from context engine |
+| `ContextBlock` | `components/ContextBlock.svelte` | Individual block with collapse, expand, drag ghost, syntax highlight, language badge, focus ring, right-click | Block data, compression levels |
+| `Modal` | `components/Modal.svelte` | Block detail view/edit with syntax-highlighted editing, role dropdown, zone selector, language badge | Block CRUD operations |
 | `Toast` | `components/Toast.svelte` | Notification system with auto-dismiss | Event stream from proxy |
 | `CommandPalette` | `components/CommandPalette.svelte` | Ctrl+K quick actions (28 commands across 6 categories) | Command execution |
 | `SearchBar` | `components/SearchBar.svelte` | Context search (Ctrl+F) with regex, case-sensitive, zone/type filters | None (client-side filtering) |
@@ -23,6 +23,7 @@
 | `BlockTypeManager` | `components/BlockTypeManager.svelte` | Custom block types CRUD in sidebar | Persist to config |
 | `ZoneManager` | `components/ZoneManager.svelte` | Custom zones CRUD with drag reorder in sidebar | Persist to config |
 | `CanvasOverlay` | `components/CanvasOverlay.svelte` | Canvas effects layer (halftone, dissolution) | None (visual only) |
+| **`ContextMenu`** | **`components/ContextMenu.svelte`** | **Right-click menu: pin, move, compress, copy, remove. Hover submenus.** | **None (UI only)** |
 | `Terminal` | `components/Terminal.svelte` | xterm.js wrapper — PTY spawn, resize, theme sync, reconnect | **Uses Tauri IPC** |
 | `TerminalPanel` | `components/TerminalPanel.svelte` | Terminal chrome — collapsed/expanded bar, clear/position/close | None (wraps Terminal) |
 
@@ -35,7 +36,7 @@ All component paths are relative to `src/lib/`.
 | Store | Location | Purpose | Backend Needs |
 |-------|----------|---------|---------------|
 | `contextStore` | `stores/context.svelte.ts` | Blocks, snapshots, CRUD, persistence | **PRIMARY** — Proxy data feed, replace mock data |
-| `selectionStore` | `stores/selection.svelte.ts` | Multi-select state, shift/ctrl-click | None (UI only) |
+| `selectionStore` | `stores/selection.svelte.ts` | Multi-select state, shift/ctrl-click, keyboard focus (`focusedId`) | None (UI only) |
 | `uiStore` | `stores/ui.svelte.ts` | Modals, toasts, drag, sidebar, context panel collapse, density | None (UI only) |
 | `themeStore` | `stores/theme.svelte.ts` | 13 presets, 18 color keys, custom themes, xterm theme mapping | Persist to user config |
 | `blockTypesStore` | `stores/blockTypes.svelte.ts` | Built-in + custom block types | Persist to user config |
@@ -114,12 +115,16 @@ interface Block {
 | `Ctrl+F` | Toggle search bar | Global |
 | `Ctrl+K` | Command palette | Global |
 | `Ctrl+[` | Toggle sidebar | Global |
+| `J` / `↓` | Navigate to next block | When not in input |
+| `K` / `↑` | Navigate to previous block | When not in input |
+| `Enter` | Open modal for focused block | When not in input |
 | `A` | Select all blocks | When not in input |
 | `Esc` | Deselect / close search | When not in input |
 | `Del/Backspace` | Remove selected blocks | When not in input |
 | `S` | Save snapshot | When not in input |
 | `F3` | Next search match | When search open |
 | `Shift+F3` | Previous search match | When search open |
+| Right-click | Context menu (pin, move, compress, copy, remove) | On blocks |
 
 ---
 
@@ -164,15 +169,17 @@ interface Block {
 ┌─────────────────────────────────────────────┐
 │ TitleBar (custom Tauri, draggable)          │
 ├─────────────────────────────────────────────┤
-│ Header (TokenBudgetBar + ThemeToggle + btns)│
+│ Header (TokenBudgetBar + toggle + btns)     │
+├─────────────────────────────────────────────┤
+│ (Status dropdown floats from "Aperture" ▾)  │  ← overlay, no layout shift
 ├────┬──┬─────────────────────────────────────┤
 │    │  │ Content Area                        │
 │ S  │R │ ┌─────────────────────────────────┐ │
 │ i  │e │ │ Toolbar (selection info + btns) │ │
 │ d  │s │ │ SearchBar (Ctrl+F)             │ │
 │ e  │i │ │ Zones (scrollable)             │ │
-│ b  │z │ │   Zone (header + blocks + grip)│ │
-│ a  │e │ │   Zone ...                     │ │
+│ b  │z │ │  ┃ Zone (header + blocks + grip)│ │  ← thread line ┃
+│ a  │e │ │  ┃ Zone ...                     │ │
 │ r  │  │ └─────────────────────────────────┘ │
 │    │H │ ── Terminal Split Handle ──          │
 │    │a │ ┌─────────────────────────────────┐ │

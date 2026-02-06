@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Block, Role } from "$lib/types";
   import { blockTypesStore, zonesStore } from "$lib/stores";
+  import { detectLanguage, highlightCode } from "$lib/utils/syntax";
 
   interface Props {
     block: Block | null;
@@ -47,6 +48,14 @@
 
   // Track if content is long enough to need expand
   const isContentLong = $derived(block ? block.content.length > 400 : false);
+
+  // Syntax highlighting for modal content (works in both view and edit modes)
+  const modalDetectedLang = $derived(block ? detectLanguage(block.content, block.role) : null);
+  const modalSyntaxHtml = $derived.by(() => {
+    if (!block || !modalDetectedLang) return null;
+    const text = isEditing ? editContent : (isContentExpanded ? block.content : getPreview(block.content));
+    return highlightCode(text, modalDetectedLang);
+  });
 
   // Reset state when modal opens/closes or block changes
   $effect(() => {
@@ -197,6 +206,9 @@
           {#if block.metadata.toolName}
             <span class="tool-name">{block.metadata.toolName}</span>
           {/if}
+          {#if modalDetectedLang}
+            <span class="lang-badge">{modalDetectedLang}</span>
+          {/if}
         </div>
         <button class="close-btn" onclick={onClose}>×</button>
       </div>
@@ -257,14 +269,38 @@
         ondblclick={handleContentDoubleClick}
       >
         {#if isEditing}
-          <textarea
-            bind:this={textareaRef}
-            bind:value={editContent}
-            spellcheck="true"
-            lang="en"
-            autocomplete="off"
-            onkeydown={handleEditKeydown}
-          ></textarea>
+          <div class="edit-overlay-container">
+            {#if modalSyntaxHtml}
+              <pre class="edit-highlight-layer syntax-highlighted" aria-hidden="true">{@html modalSyntaxHtml}
+</pre>
+            {:else}
+              <pre class="edit-highlight-layer" aria-hidden="true">{editContent}
+</pre>
+            {/if}
+            <textarea
+              bind:this={textareaRef}
+              bind:value={editContent}
+              class="edit-textarea-layer"
+              class:has-highlight={!!modalSyntaxHtml}
+              spellcheck="true"
+              lang="en"
+              autocomplete="off"
+              onkeydown={handleEditKeydown}
+              onscroll={(e) => {
+                const target = e.currentTarget;
+                const pre = target.previousElementSibling as HTMLElement;
+                if (pre) {
+                  pre.scrollTop = target.scrollTop;
+                  pre.scrollLeft = target.scrollLeft;
+                }
+              }}
+            ></textarea>
+          </div>
+        {:else if modalSyntaxHtml}
+          <pre class="syntax-highlighted">{@html modalSyntaxHtml}</pre>
+          {#if !isContentExpanded && isContentLong}
+            <div class="content-fade"></div>
+          {/if}
         {:else}
           <pre>{isContentExpanded ? block.content : getPreview(block.content)}</pre>
           {#if !isContentExpanded && isContentLong}
@@ -552,6 +588,18 @@
     color: var(--text-muted);
   }
 
+  .lang-badge {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    font-weight: 600;
+    padding: 3px 6px;
+    border-radius: 2px;
+    background: color-mix(in srgb, var(--role-user) 15%, transparent);
+    color: var(--role-user);
+    letter-spacing: 0.3px;
+    text-transform: lowercase;
+  }
+
   .close-btn {
     font-size: 18px;
     line-height: 1;
@@ -736,7 +784,29 @@
     padding: 0;
   }
 
-  .modal-content textarea {
+  /* Overlay edit pattern: highlighted pre behind transparent textarea */
+  .edit-overlay-container {
+    position: relative;
+    width: 100%;
+    min-height: 200px;
+  }
+
+  .edit-highlight-layer {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    line-height: 1.55;
+    color: var(--text-secondary);
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin: 0;
+    padding: 14px;
+    pointer-events: none;
+    overflow: hidden;
+  }
+
+  .edit-textarea-layer {
+    position: absolute;
+    inset: 0;
     width: 100%;
     height: 100%;
     min-height: 200px;
@@ -745,15 +815,21 @@
     font-size: 11px;
     line-height: 1.55;
     color: var(--text-secondary);
-    background: var(--bg-elevated);
+    background: transparent;
     border: none;
     outline: none;
     resize: none;
     white-space: pre-wrap;
     word-break: break-word;
+    caret-color: var(--text-primary);
   }
 
-  .modal-content textarea:focus {
+  /* When syntax highlighting is active, hide textarea text — the pre shows colors */
+  .edit-textarea-layer.has-highlight {
+    color: transparent;
+  }
+
+  .edit-textarea-layer:focus {
     box-shadow: inset 0 0 0 1px var(--accent);
   }
 

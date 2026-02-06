@@ -16,6 +16,7 @@ import { contextStore } from "./context.svelte";
 let selectedIds = $state(new Set<string>());
 let _lastSelectedId = $state<string | null>(null);
 let lastSelectedIndex = $state<number | null>(null);
+let focusedId = $state<string | null>(null);
 
 // ============================================================================
 // Derived State
@@ -97,6 +98,16 @@ function deselect(): void {
   selectedIds = new Set();
   _lastSelectedId = null;
   lastSelectedIndex = null;
+  focusedId = null;
+}
+
+/**
+ * Focus a specific block by ID (keyboard navigation).
+ * Also selects it as a single selection.
+ */
+function focus(blockId: string): void {
+  select(blockId);
+  focusedId = blockId;
 }
 
 function isSelected(blockId: string): boolean {
@@ -137,6 +148,9 @@ export const selectionStore = {
   get count() {
     return selectedIds.size;
   },
+  get focusedId() {
+    return focusedId;
+  },
 
   // Actions
   select,
@@ -148,4 +162,5 @@ export const selectionStore = {
   deselect,
   isSelected,
   handleClick,
+  focus,
 };

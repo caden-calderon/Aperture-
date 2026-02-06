@@ -213,27 +213,58 @@ Users can customize any of 18 color properties. Custom themes persist to localSt
 const TOOL_RESULTS = [
   {
     name: "Read",
-    content: `src/lib/types.ts (187 lines)
-\`\`\`typescript
-export type Role = "system" | "user" | "assistant" | "tool_use" | "tool_result";
+    content: `export type Role = "system" | "user" | "assistant" | "tool_use" | "tool_result";
 export type Zone = "primacy" | "middle" | "recency";
+export type CompressionLevel = "original" | "trimmed" | "summarized" | "minimal";
 
 export interface Block {
   id: string;
   role: Role;
   content: string;
   tokens: number;
-  // ... more fields
-}
-\`\`\``,
+  timestamp: Date;
+  zone: Zone;
+  pinned: "top" | "bottom" | null;
+  compressionLevel: CompressionLevel;
+  usageHeat: number;
+  positionRelevance: number;
+  metadata: BlockMetadata;
+}`,
   },
   {
-    name: "Glob",
-    content: `Found 12 files matching **/*.svelte:
-- src/routes/+page.svelte
-- src/lib/components/Zone.svelte
-- src/lib/components/ContextBlock.svelte
-- src/lib/components/TokenBudgetBar.svelte`,
+    name: "Read",
+    content: `use axum::{Router, routing::post, extract::State, response::IntoResponse};
+use tokio::sync::RwLock;
+use std::sync::Arc;
+
+#[derive(Clone)]
+struct AppState {
+    sessions: Arc<RwLock<HashMap<String, Session>>>,
+    proxy_config: ProxyConfig,
+}
+
+async fn forward_request(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Result<impl IntoResponse, ProxyError> {
+    let upstream = detect_provider(&headers)?;
+    let response = state.proxy_config
+        .client
+        .post(&upstream.url)
+        .headers(redact_sensitive(&headers))
+        .body(body)
+        .send()
+        .await?;
+    Ok(response)
+}
+
+pub fn create_router(state: AppState) -> Router {
+    Router::new()
+        .route("/v1/messages", post(forward_request))
+        .route("/v1/chat/completions", post(forward_request))
+        .with_state(state)
+}`,
   },
   {
     name: "Edit",
@@ -244,52 +275,159 @@ export interface Block {
   },
   {
     name: "Read",
-    content: `src/lib/stores/context.svelte.ts (245 lines)
-\`\`\`typescript
-let blocks = $state<Block[]>([]);
-let snapshots = $state<Snapshot[]>([]);
+    content: `import numpy as np
+from dataclasses import dataclass
+from typing import Optional
 
-const blocksByZone = $derived.by(() => {
-  const grouped: Record<string, Block[]> = {};
-  for (const block of blocks) {
-    if (!grouped[block.zone]) grouped[block.zone] = [];
-    grouped[block.zone].push(block);
-  }
-  return grouped;
-});
-\`\`\``,
-  },
-  {
-    name: "Grep",
-    content: `Found 23 matches for "useState" in 8 files:
-Note: Using Svelte 5 runes instead ($state, $derived)
-- src/lib/stores/*.svelte.ts: 18 occurrences
-- src/lib/components/*.svelte: 5 occurrences`,
-  },
-  {
-    name: "Write",
-    content: `Created src/lib/components/CommandPalette.svelte
-- 156 lines
-- Implements fuzzy search with fuse.js
-- Keyboard navigation (up/down/enter/escape)`,
+@dataclass
+class TokenStats:
+    total: int
+    by_role: dict[str, int]
+    by_zone: dict[str, int]
+    compression_ratio: float
+
+def calculate_compression_savings(
+    blocks: list[dict],
+    target_level: str = "trimmed",
+) -> TokenStats:
+    """Calculate token savings for a given compression level."""
+    original_tokens = sum(b["tokens"] for b in blocks)
+    compressed = [compress_block(b, target_level) for b in blocks]
+    new_tokens = sum(b["tokens"] for b in compressed)
+
+    return TokenStats(
+        total=new_tokens,
+        by_role=_group_by(compressed, "role"),
+        by_zone=_group_by(compressed, "zone"),
+        compression_ratio=new_tokens / original_tokens if original_tokens > 0 else 1.0,
+    )`,
   },
   {
     name: "Bash",
-    content: `$ npm run check
-svelte-check found 0 errors and 0 warnings
-
-$ cargo clippy
-Finished dev profile [unoptimized + debuginfo] target(s) in 0.21s`,
+    content: `$ cargo test --manifest-path src-tauri/Cargo.toml
+   Compiling aperture v0.1.0
+    Finished test [unoptimized + debuginfo] target(s) in 4.23s
+     Running unittests src/lib.rs
+running 12 tests
+test proxy::tests::test_detect_anthropic ... ok
+test proxy::tests::test_detect_openai ... ok
+test proxy::tests::test_sse_streaming ... ok
+test engine::tests::test_block_creation ... ok
+test engine::tests::test_zone_assignment ... ok
+test engine::tests::test_token_counting ... ok
+test engine::tests::test_compression_original ... ok
+test engine::tests::test_compression_trimmed ... ok
+test engine::tests::test_compression_summarized ... ok
+test terminal::tests::test_session_spawn ... ok
+test terminal::tests::test_session_resize ... ok
+test terminal::tests::test_session_cleanup ... ok
+test result: ok. 12 passed; 0 failed; 0 ignored`,
   },
   {
     name: "Read",
-    content: `src/app.css (312 lines)
-CSS Variables defined:
---bg-base, --bg-surface, --bg-elevated, --bg-hover
---text-primary, --text-secondary, --text-muted
---accent, --zone-primacy, --zone-middle, --zone-recency
---font-mono: 'JetBrains Mono'
---font-display: 'IBM Plex Mono'`,
+    content: `{
+  "name": "aperture",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "vite dev",
+    "build": "vite build",
+    "preview": "vite preview",
+    "check": "svelte-check --tsconfig ./tsconfig.json",
+    "tauri": "tauri"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.0.0",
+    "@tauri-apps/plugin-shell": "^2.0.0",
+    "@xterm/xterm": "^5.5.0",
+    "@xterm/addon-fit": "^0.10.0",
+    "prismjs": "^1.30.0"
+  },
+  "devDependencies": {
+    "@sveltejs/adapter-static": "^3.0.0",
+    "@sveltejs/kit": "^2.0.0",
+    "@sveltejs/vite-plugin-svelte": "^4.0.0",
+    "svelte": "^5.0.0",
+    "tailwindcss": "^4.0.0",
+    "typescript": "^5.0.0",
+    "vite": "^6.0.0"
+  }
+}`,
+  },
+  {
+    name: "Read",
+    content: `apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aperture-proxy
+  namespace: ai-tools
+  labels:
+    app: aperture
+    component: proxy
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: aperture
+  template:
+    spec:
+      containers:
+        - name: proxy
+          image: aperture/proxy:latest
+          ports:
+            - containerPort: 5400
+          env:
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: api-keys
+                  key: anthropic
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "1000m"`,
+  },
+  {
+    name: "Read",
+    content: `.zone-header {
+  display: flex;
+  align-items: center;
+  padding: 6px 10px;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.1s ease;
+  border-radius: 4px 4px 0 0;
+}
+
+.zone-header:hover {
+  background: var(--bg-hover);
+}
+
+.zone-accent {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.zone-name {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: 0.02em;
+}
+
+.zone-stats {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-left: auto;
+}`,
   },
   {
     name: "Edit",
