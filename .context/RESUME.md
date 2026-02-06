@@ -783,8 +783,26 @@ make test-ui     # Frontend tests
 
 ### Next Session TODO
 
+#### Testing & Stability
 - [ ] Test all features in `npm run tauri dev` (full desktop app)
 - [ ] Performance check with many blocks
-- [ ] User's UI additions/fixes
+
+#### UI Enhancements (Priority Order)
+
+**High Impact:**
+1. **Header bar enhancements** — Add proxy status indicator (connected/disconnected dot), current session name, and block count to the existing header bar alongside the token budget display. No new bar needed.
+2. **Block content syntax highlighting** — Code blocks, JSON, and markdown inside blocks should get basic syntax coloring. Huge readability win for tool_use/tool_result blocks. Consider a lightweight lib like Shiki or Prism.
+3. **Drag-and-drop zone minimap** — Compact visual minimap of all zones (sidebar or header) for quick drag targets without scrolling.
+4. **Context diff view** — In the modal, show a diff between compression levels (original vs trimmed vs summarized). Core to Aperture's value prop — users need to see what compression removes.
+
+**Medium Impact:**
+5. **Block grouping/threading** — Visually connect user→assistant→tool chains with a thread indicator (vertical line connecting related turns). Makes conversation flow visible.
+6. **Keyboard-driven block navigation** — Arrow keys to move selection, J/K vim-style, Enter to open modal. Power user essential.
+7. **Token sparkline per zone** — Small inline sparkline in zone headers showing token usage trend over time. Information density without taking space.
+8. **Right-click context menus** — Pin, move, compress, copy content via right-click on blocks. Faster than opening modal for quick actions.
+
+**Polish:**
+9. **Animation for block add/remove** — Fade+slide animation for block state changes instead of instant appear/disappear.
+10. **Empty state design** — Helpful onboarding view when no blocks exist instead of empty zones.
 
 **Phase 0 status: ~99% COMPLETE** — All core features + embedded terminal implemented
