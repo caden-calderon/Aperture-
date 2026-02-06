@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { TokenBudgetBar, Zone, Modal, Toast, CommandPalette, ThemeToggle, DensityControl, TitleBar, ThemeCustomizer, BlockTypeManager, ZoneManager } from "$lib/components";
-  import { contextStore, selectionStore, uiStore, themeStore, blockTypesStore, zonesStore } from "$lib/stores";
+  import { TokenBudgetBar, Zone, Modal, Toast, CommandPalette, ThemeToggle, DensityControl, TitleBar, ThemeCustomizer, BlockTypeManager, ZoneManager, SearchBar } from "$lib/components";
+  import { contextStore, selectionStore, uiStore, themeStore, blockTypesStore, zonesStore, searchStore } from "$lib/stores";
   import type { Zone as ZoneType, Block } from "$lib/types";
 
   // Sidebar resize state
@@ -52,7 +52,8 @@
     if (sidebarResizeRaf) cancelAnimationFrame(sidebarResizeRaf);
     sidebarResizeRaf = requestAnimationFrame(() => {
       const delta = e.clientX - resizeStartX;
-      const newWidth = Math.max(180, Math.min(400, resizeStartWidth + delta));
+      // Allow dragging all the way down for snap-to-collapse
+      const newWidth = Math.max(uiStore.collapsedSidebarWidth, Math.min(400, resizeStartWidth + delta));
       // Direct DOM update during drag for smoothness — bypasses Svelte reactivity
       if (sidebarRef) {
         sidebarRef.style.width = `${newWidth}px`;
@@ -63,10 +64,12 @@
   function handleResizeEnd() {
     if (!isResizingSidebar) return;
     if (sidebarResizeRaf) cancelAnimationFrame(sidebarResizeRaf);
-    // Commit final width to store (triggers one reactive update)
+    // Commit final width to store (triggers one reactive update — handles snap-to-collapse)
     if (sidebarRef) {
       const finalWidth = parseInt(sidebarRef.style.width) || uiStore.sidebarWidth;
       uiStore.setSidebarWidth(finalWidth);
+      // Sync DOM with store-determined width
+      sidebarRef.style.width = `${uiStore.sidebarWidth}px`;
     }
     isResizingSidebar = false;
     document.body.style.cursor = '';
@@ -121,11 +124,26 @@
 
   // Keyboard shortcuts
   function handleKeydown(e: KeyboardEvent) {
+    // Ctrl+F always opens search, even from inputs
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "f") {
+      e.preventDefault();
+      searchStore.toggle();
+      return;
+    }
+
     if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
       return;
     }
 
     if (uiStore.hasModal || uiStore.commandPaletteOpen) {
+      return;
+    }
+
+    // F3 / Shift+F3 for search navigation (when search is open)
+    if (e.key === "F3" && searchStore.isOpen) {
+      e.preventDefault();
+      if (e.shiftKey) searchStore.previousMatch();
+      else searchStore.nextMatch();
       return;
     }
 
@@ -139,7 +157,11 @@
         break;
       case "escape":
         e.preventDefault();
-        selectionStore.deselect();
+        if (searchStore.isOpen) {
+          searchStore.close();
+        } else {
+          selectionStore.deselect();
+        }
         break;
       case "delete":
       case "backspace":
@@ -162,6 +184,12 @@
         if (e.ctrlKey || e.metaKey) {
           e.preventDefault();
           uiStore.toggleCommandPalette();
+        }
+        break;
+      case "[":
+        if (e.ctrlKey || e.metaKey) {
+          e.preventDefault();
+          uiStore.toggleSidebar();
         }
         break;
     }
@@ -272,29 +300,22 @@
   // Command palette handler
   function handleCommand(command: string) {
     switch (command) {
-      case 'select-all':
-        selectionStore.selectAll();
-        uiStore.showToast('Selected all blocks', 'info');
+      // View
+      case 'toggle-sidebar':
+        uiStore.toggleSidebar();
         break;
-      case 'deselect':
-        selectionStore.deselect();
-        break;
-      case 'remove-selected':
-        if (selectionStore.hasSelection) {
-          const count = selectionStore.count;
-          contextStore.removeBlocks([...selectionStore.selectedIds]);
-          selectionStore.deselect();
-          uiStore.showToast(`Removed ${count} block(s)`, 'success');
+      case 'expand-all-zones': {
+        uiStore.expandAllZones();
+        // Also expand all zone heights
+        for (const z of zonesStore.zonesByDisplayOrder) {
+          zonesStore.setZoneExpanded(z.id, true);
         }
-        break;
-      case 'snapshot': {
-        const snap = contextStore.saveSnapshot(`Snapshot ${contextStore.snapshots.length + 1}`);
-        uiStore.showToast(`Saved: ${snap.name}`, 'success');
+        uiStore.showToast('All zones expanded', 'info');
         break;
       }
-      case 'load-demo':
-        contextStore.loadDemoData();
-        uiStore.showToast('Demo data loaded', 'success');
+      case 'collapse-all-zones':
+        uiStore.collapseAllZonesFrom(zonesStore.zonesByDisplayOrder.map(z => z.id));
+        uiStore.showToast('All zones collapsed', 'info');
         break;
       case 'toggle-primacy':
         uiStore.toggleZoneCollapse('primacy');
@@ -304,6 +325,127 @@
         break;
       case 'toggle-recency':
         uiStore.toggleZoneCollapse('recency');
+        break;
+
+      // Search
+      case 'search':
+        searchStore.open();
+        break;
+      case 'search-next':
+        searchStore.nextMatch();
+        break;
+      case 'search-prev':
+        searchStore.previousMatch();
+        break;
+      case 'search-select-all': {
+        const matchedIds = searchStore.selectAllResults();
+        if (matchedIds.length > 0) {
+          selectionStore.deselect();
+          for (const id of matchedIds) {
+            selectionStore.handleClick(id, { shiftKey: false, ctrlKey: true, metaKey: false });
+          }
+          uiStore.showToast(`Selected ${matchedIds.length} matching block(s)`, 'info');
+        }
+        break;
+      }
+
+      // Selection
+      case 'select-all':
+        selectionStore.selectAll();
+        uiStore.showToast('Selected all blocks', 'info');
+        break;
+      case 'deselect':
+        selectionStore.deselect();
+        break;
+
+      // Edit
+      case 'remove-selected':
+        if (selectionStore.hasSelection) {
+          const count = selectionStore.count;
+          contextStore.removeBlocks([...selectionStore.selectedIds]);
+          selectionStore.deselect();
+          uiStore.showToast(`Removed ${count} block(s)`, 'success');
+        }
+        break;
+      case 'pin-selected-top':
+        if (selectionStore.hasSelection) {
+          for (const id of selectionStore.selectedIds) {
+            contextStore.pinBlock(id, 'top');
+          }
+          uiStore.showToast(`Pinned ${selectionStore.count} block(s) to top`, 'success');
+        }
+        break;
+      case 'pin-selected-bottom':
+        if (selectionStore.hasSelection) {
+          for (const id of selectionStore.selectedIds) {
+            contextStore.pinBlock(id, 'bottom');
+          }
+          uiStore.showToast(`Pinned ${selectionStore.count} block(s) to bottom`, 'success');
+        }
+        break;
+      case 'unpin-selected':
+        if (selectionStore.hasSelection) {
+          for (const id of selectionStore.selectedIds) {
+            contextStore.pinBlock(id, null);
+          }
+          uiStore.showToast(`Unpinned ${selectionStore.count} block(s)`, 'success');
+        }
+        break;
+      case 'compress-selected-trimmed':
+        if (selectionStore.hasSelection) {
+          for (const id of selectionStore.selectedIds) {
+            contextStore.setCompressionLevel(id, 'trimmed');
+          }
+          uiStore.showToast(`Compressed ${selectionStore.count} block(s) to trimmed`, 'success');
+        }
+        break;
+      case 'compress-selected-summarized':
+        if (selectionStore.hasSelection) {
+          for (const id of selectionStore.selectedIds) {
+            contextStore.setCompressionLevel(id, 'summarized');
+          }
+          uiStore.showToast(`Compressed ${selectionStore.count} block(s) to summarized`, 'success');
+        }
+        break;
+      case 'move-selected-primacy':
+        if (selectionStore.hasSelection) {
+          for (const id of selectionStore.selectedIds) {
+            contextStore.moveBlock(id, 'primacy');
+          }
+          uiStore.showToast(`Moved ${selectionStore.count} block(s) to Primacy`, 'success');
+        }
+        break;
+      case 'move-selected-middle':
+        if (selectionStore.hasSelection) {
+          for (const id of selectionStore.selectedIds) {
+            contextStore.moveBlock(id, 'middle');
+          }
+          uiStore.showToast(`Moved ${selectionStore.count} block(s) to Middle`, 'success');
+        }
+        break;
+      case 'move-selected-recency':
+        if (selectionStore.hasSelection) {
+          for (const id of selectionStore.selectedIds) {
+            contextStore.moveBlock(id, 'recency');
+          }
+          uiStore.showToast(`Moved ${selectionStore.count} block(s) to Recency`, 'success');
+        }
+        break;
+
+      // Data
+      case 'snapshot': {
+        const snap = contextStore.saveSnapshot(`Snapshot ${contextStore.snapshots.length + 1}`);
+        uiStore.showToast(`Saved: ${snap.name}`, 'success');
+        break;
+      }
+      case 'load-demo':
+        contextStore.loadDemoData();
+        uiStore.showToast('Demo data loaded', 'success');
+        break;
+      case 'clear-all-blocks':
+        contextStore.removeBlocks(contextStore.blocks.map(b => b.id));
+        selectionStore.deselect();
+        uiStore.showToast('All blocks cleared', 'success');
         break;
     }
   }
@@ -341,62 +483,81 @@
   <!-- Main -->
   <main class="main">
     <!-- Sidebar -->
-    <aside class="sidebar" bind:this={sidebarRef} style:width="{uiStore.sidebarWidth}px">
-      <section class="sidebar-section">
-        <h3 class="sidebar-heading">Snapshots</h3>
-        {#if contextStore.snapshots.length === 0}
-          <p class="sidebar-empty">No snapshots</p>
-        {:else}
-          <div class="snapshot-list">
-            {#each contextStore.snapshots as snapshot (snapshot.id)}
-              <button
-                class="snapshot-item"
-                onclick={() => {
-                  contextStore.restoreSnapshot(snapshot.id);
-                  uiStore.showToast(`Restored: ${snapshot.name}`, "success");
-                }}
-              >
-                <span class="snapshot-name">{snapshot.name}</span>
-                <span class="snapshot-meta">{formatNumber(snapshot.totalTokens)}</span>
-              </button>
-            {/each}
-          </div>
-        {/if}
-        <button
-          class="btn btn-full"
-          onclick={() => {
-            const snap = contextStore.saveSnapshot(`Snapshot ${contextStore.snapshots.length + 1}`);
-            uiStore.showToast(`Saved: ${snap.name}`, "success");
-          }}
-        >
-          Save Snapshot
-        </button>
-      </section>
-
-      <!-- Block Types Manager -->
-      <BlockTypeManager />
-
-      <!-- Zone Manager -->
-      <ZoneManager />
-
-      <section class="sidebar-section">
-        <h3 class="sidebar-heading">Display</h3>
-        <DensityControl />
-      </section>
-
-      <!-- Theme Customizer -->
-      <ThemeCustomizer />
-
-      <section class="sidebar-section sidebar-grow">
-        <h3 class="sidebar-heading">Shortcuts</h3>
-        <div class="shortcuts">
-          <div class="shortcut"><kbd>A</kbd> Select all</div>
-          <div class="shortcut"><kbd>Esc</kbd> Deselect</div>
-          <div class="shortcut"><kbd>Del</kbd> Remove</div>
-          <div class="shortcut"><kbd>S</kbd> Snapshot</div>
-          <div class="shortcut"><kbd>⌘K</kbd> Commands</div>
+    <aside
+      class="sidebar"
+      class:sidebar-collapsed={uiStore.sidebarCollapsed}
+      class:sidebar-animating={!isResizingSidebar}
+      bind:this={sidebarRef}
+      style:width="{uiStore.sidebarWidth}px"
+    >
+      {#if uiStore.sidebarCollapsed}
+        <!-- Collapsed icon bar -->
+        <div class="sidebar-icons">
+          <button class="sidebar-icon" title="Snapshots" onclick={() => uiStore.toggleSidebar()}>S</button>
+          <button class="sidebar-icon" title="Block Types" onclick={() => uiStore.toggleSidebar()}>B</button>
+          <button class="sidebar-icon" title="Zones" onclick={() => uiStore.toggleSidebar()}>Z</button>
+          <button class="sidebar-icon" title="Theme" onclick={() => uiStore.toggleSidebar()}>T</button>
+          <button class="sidebar-icon" title="Display" onclick={() => uiStore.toggleSidebar()}>D</button>
         </div>
-      </section>
+      {:else}
+        <section class="sidebar-section">
+          <h3 class="sidebar-heading">Snapshots</h3>
+          {#if contextStore.snapshots.length === 0}
+            <p class="sidebar-empty">No snapshots</p>
+          {:else}
+            <div class="snapshot-list">
+              {#each contextStore.snapshots as snapshot (snapshot.id)}
+                <button
+                  class="snapshot-item"
+                  onclick={() => {
+                    contextStore.restoreSnapshot(snapshot.id);
+                    uiStore.showToast(`Restored: ${snapshot.name}`, "success");
+                  }}
+                >
+                  <span class="snapshot-name">{snapshot.name}</span>
+                  <span class="snapshot-meta">{formatNumber(snapshot.totalTokens)}</span>
+                </button>
+              {/each}
+            </div>
+          {/if}
+          <button
+            class="btn btn-full"
+            onclick={() => {
+              const snap = contextStore.saveSnapshot(`Snapshot ${contextStore.snapshots.length + 1}`);
+              uiStore.showToast(`Saved: ${snap.name}`, "success");
+            }}
+          >
+            Save Snapshot
+          </button>
+        </section>
+
+        <!-- Block Types Manager -->
+        <BlockTypeManager />
+
+        <!-- Zone Manager -->
+        <ZoneManager />
+
+        <section class="sidebar-section">
+          <h3 class="sidebar-heading">Display</h3>
+          <DensityControl />
+        </section>
+
+        <!-- Theme Customizer -->
+        <ThemeCustomizer />
+
+        <section class="sidebar-section sidebar-grow">
+          <h3 class="sidebar-heading">Shortcuts</h3>
+          <div class="shortcuts">
+            <div class="shortcut"><kbd>A</kbd> Select all</div>
+            <div class="shortcut"><kbd>Esc</kbd> Deselect</div>
+            <div class="shortcut"><kbd>Del</kbd> Remove</div>
+            <div class="shortcut"><kbd>S</kbd> Snapshot</div>
+            <div class="shortcut"><kbd>⌘K</kbd> Commands</div>
+            <div class="shortcut"><kbd>⌘[</kbd> Sidebar</div>
+            <div class="shortcut"><kbd>⌘F</kbd> Search</div>
+          </div>
+        </section>
+      {/if}
     </aside>
 
     <!-- Sidebar Resize Handle -->
@@ -405,7 +566,14 @@
       class="sidebar-resize-handle"
       class:active={isResizingSidebar}
       onmousedown={handleResizeStart}
-    ></div>
+    >
+      <button
+        class="sidebar-toggle-btn"
+        title={uiStore.sidebarCollapsed ? "Expand sidebar (Ctrl+[)" : "Collapse sidebar (Ctrl+[)"}
+        onmousedown={(e) => e.stopPropagation()}
+        onclick={() => uiStore.toggleSidebar()}
+      >{uiStore.sidebarCollapsed ? "›" : "‹"}</button>
+    </div>
 
     <!-- Content -->
     <div class="content">
@@ -417,6 +585,9 @@
           <strong>{formatNumber(selectionStore.selectedTokens)}</strong> tokens
         </div>
         <div class="toolbar-actions">
+          <button class="btn btn-sm" onclick={() => searchStore.toggle()} title="Search (Ctrl+F)">
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="6.5" cy="6.5" r="5"/><line x1="10.5" y1="10.5" x2="15" y2="15"/></svg>
+          </button>
           <button class="btn btn-sm" onclick={() => selectionStore.selectAll()}>Select All</button>
           <button class="btn btn-sm" onclick={() => selectionStore.deselect()}>Clear</button>
           <button
@@ -433,6 +604,9 @@
           </button>
         </div>
       </div>
+
+      <!-- Search Bar -->
+      <SearchBar />
 
       <!-- Zones -->
       <div class="zones" class:resizing={resizingZoneId !== null}>
@@ -604,6 +778,47 @@
     scrollbar-gutter: stable;
   }
 
+  /* Sidebar collapsed state */
+  .sidebar.sidebar-collapsed {
+    overflow: hidden;
+  }
+
+  .sidebar.sidebar-animating {
+    transition: width 0.2s ease;
+  }
+
+  .sidebar-icons {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 8px 0;
+    width: 100%;
+  }
+
+  .sidebar-icon {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-muted);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.1s ease;
+  }
+
+  .sidebar-icon:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+    border-color: var(--border-subtle);
+  }
+
   /* Sidebar Resize Handle */
   .sidebar-resize-handle {
     width: 4px;
@@ -611,11 +826,46 @@
     background: transparent;
     transition: background 0.15s ease;
     flex-shrink: 0;
+    position: relative;
   }
 
   .sidebar-resize-handle:hover,
   .sidebar-resize-handle.active {
     background: var(--accent);
+  }
+
+  .sidebar-toggle-btn {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 16px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-mono);
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-muted);
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: 3px;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.15s ease, color 0.1s ease;
+    z-index: 5;
+    padding: 0;
+    line-height: 1;
+  }
+
+  .sidebar-resize-handle:hover .sidebar-toggle-btn {
+    opacity: 1;
+  }
+
+  .sidebar-toggle-btn:hover {
+    color: var(--text-primary);
+    border-color: var(--accent);
   }
 
   .sidebar-section {

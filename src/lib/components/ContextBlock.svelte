@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Block } from "$lib/types";
   import { blockTypesStore } from "$lib/stores";
+  import { searchStore, type SearchMatch } from "$lib/stores/search.svelte";
 
   interface Props {
     block: Block;
@@ -58,6 +59,57 @@
   // Whether to show full content (zone-level expand OR block not collapsed)
   const showContent = $derived(!isCollapsed);
   const showFullContent = $derived(contentExpanded && !isCollapsed);
+
+  // Search integration
+  const blockMatches = $derived(searchStore.isOpen ? searchStore.getBlockMatches(block.id) : []);
+  const isCurrentMatch = $derived(searchStore.isOpen && searchStore.isCurrentMatchBlock(block.id));
+  const currentBlockMatch = $derived(searchStore.getCurrentMatchForBlock(block.id));
+  let blockEl = $state<HTMLElement | null>(null);
+
+  // Scroll into view when this block is the current match
+  $effect(() => {
+    if (isCurrentMatch && blockEl) {
+      blockEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  });
+
+  /**
+   * Highlight search matches in content.
+   * XSS-safe: escapes HTML entities FIRST, then inserts <mark> tags.
+   */
+  function highlightContent(content: string, matches: SearchMatch[], currentMatch: SearchMatch | null): string {
+    if (matches.length === 0) return escapeHtml(content);
+
+    // Sort matches by position (ascending)
+    const sorted = [...matches].sort((a, b) => a.startPos - b.startPos);
+
+    // Build result by walking through original content
+    let result = "";
+    let lastEnd = 0;
+
+    for (const m of sorted) {
+      // Escape text before this match
+      result += escapeHtml(content.slice(lastEnd, m.startPos));
+      // Insert highlighted match
+      const isCurrent = currentMatch && m.startPos === currentMatch.startPos && m.matchIndex === currentMatch.matchIndex;
+      const cls = isCurrent ? "search-match current-match" : "search-match";
+      result += `<mark class="${cls}">${escapeHtml(content.slice(m.startPos, m.endPos))}</mark>`;
+      lastEnd = m.endPos;
+    }
+
+    // Escape remaining text
+    result += escapeHtml(content.slice(lastEnd));
+    return result;
+  }
+
+  function escapeHtml(str: string): string {
+    return str
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
 
   function handleClick(e: MouseEvent) {
     onSelect?.(block.id, {
@@ -134,8 +186,10 @@
   class:dragging
   class:collapsed={isCollapsed}
   class:pinned={block.pinned !== null}
+  class:current-search-match={isCurrentMatch}
   style:--role-color={displayColor}
   data-block-id={block.id}
+  bind:this={blockEl}
   role="button"
   tabindex="0"
   draggable="true"
@@ -172,7 +226,15 @@
 
   {#if showContent}
     <div class="block-content" class:content-expanded={showFullContent} class:has-overflow={isOverflowing}>
-      <pre bind:this={preRef}>{showFullContent ? block.content : getPreview(block.content)}</pre>
+      {#if blockMatches.length > 0}
+        <pre bind:this={preRef}>{@html highlightContent(
+          showFullContent ? block.content : getPreview(block.content),
+          blockMatches.filter(m => showFullContent || m.startPos < 180),
+          currentBlockMatch
+        )}</pre>
+      {:else}
+        <pre bind:this={preRef}>{showFullContent ? block.content : getPreview(block.content)}</pre>
+      {/if}
     </div>
   {/if}
 
@@ -402,5 +464,23 @@
     border-radius: 10px;
     z-index: 10;
     box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  }
+
+  /* Search highlighting */
+  .block.current-search-match {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent), 0 0 8px color-mix(in srgb, var(--accent) 30%, transparent);
+  }
+
+  .block :global(.search-match) {
+    background: color-mix(in srgb, var(--semantic-warning) 35%, transparent);
+    color: inherit;
+    border-radius: 1px;
+    padding: 0 1px;
+  }
+
+  .block :global(.current-match) {
+    background: color-mix(in srgb, var(--accent) 45%, transparent);
+    outline: 1px solid var(--accent);
   }
 </style>

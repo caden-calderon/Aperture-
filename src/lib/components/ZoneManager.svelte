@@ -450,15 +450,20 @@
     color: var(--text-secondary);
     font-weight: 500;
     flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .zone-stats {
     display: flex;
-    gap: 8px;
+    gap: 6px;
     font-family: var(--font-mono);
     font-size: 9px;
     color: var(--text-muted);
     font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
   }
 
   .zone-count {

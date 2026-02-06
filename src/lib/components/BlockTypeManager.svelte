@@ -289,7 +289,7 @@
   .type-item-main {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     padding: 4px 6px;
     font-size: 11px;
     background: transparent;
@@ -299,6 +299,7 @@
     transition: background 0.1s ease;
     text-align: left;
     width: 100%;
+    min-width: 0;
   }
 
   .type-item:hover,
@@ -338,6 +339,10 @@
     color: var(--text-secondary);
     flex: 1;
     font-size: 10px;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .type-badge {
@@ -347,14 +352,17 @@
     background: var(--bg-muted);
     border-radius: 2px;
     color: var(--text-muted);
+    flex-shrink: 0;
   }
 
   .type-count {
+    font-family: var(--font-mono);
     font-size: 9px;
     color: var(--text-muted);
     font-variant-numeric: tabular-nums;
-    min-width: 30px;
+    min-width: 28px;
     text-align: right;
+    flex-shrink: 0;
   }
 
   .type-actions {

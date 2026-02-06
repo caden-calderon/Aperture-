@@ -12,14 +12,39 @@
   let selectedIndex = $state(0);
 
   const commands = [
-    { id: 'select-all', label: 'Select All Blocks', shortcut: 'A', category: 'Selection' },
-    { id: 'deselect', label: 'Deselect All', shortcut: 'Esc', category: 'Selection' },
-    { id: 'remove-selected', label: 'Remove Selected', shortcut: 'Del', category: 'Edit' },
-    { id: 'snapshot', label: 'Save Snapshot', shortcut: 'S', category: 'Snapshots' },
-    { id: 'load-demo', label: 'Load Demo Data', shortcut: '', category: 'Data' },
+    // View
+    { id: 'toggle-sidebar', label: 'Toggle Sidebar', shortcut: '⌘[', category: 'View' },
+    { id: 'expand-all-zones', label: 'Expand All Zones', shortcut: '', category: 'View' },
+    { id: 'collapse-all-zones', label: 'Collapse All Zones', shortcut: '', category: 'View' },
     { id: 'toggle-primacy', label: 'Toggle Primacy Zone', shortcut: '', category: 'View' },
     { id: 'toggle-middle', label: 'Toggle Middle Zone', shortcut: '', category: 'View' },
     { id: 'toggle-recency', label: 'Toggle Recency Zone', shortcut: '', category: 'View' },
+
+    // Search
+    { id: 'search', label: 'Search Context', shortcut: '⌘F', category: 'Search' },
+    { id: 'search-next', label: 'Next Match', shortcut: 'F3', category: 'Search' },
+    { id: 'search-prev', label: 'Previous Match', shortcut: '⇧F3', category: 'Search' },
+    { id: 'search-select-all', label: 'Select All Search Results', shortcut: '', category: 'Search' },
+
+    // Selection
+    { id: 'select-all', label: 'Select All Blocks', shortcut: 'A', category: 'Selection' },
+    { id: 'deselect', label: 'Deselect All', shortcut: 'Esc', category: 'Selection' },
+
+    // Edit
+    { id: 'remove-selected', label: 'Remove Selected', shortcut: 'Del', category: 'Edit' },
+    { id: 'pin-selected-top', label: 'Pin Selected to Top', shortcut: '', category: 'Edit' },
+    { id: 'pin-selected-bottom', label: 'Pin Selected to Bottom', shortcut: '', category: 'Edit' },
+    { id: 'unpin-selected', label: 'Unpin Selected', shortcut: '', category: 'Edit' },
+    { id: 'compress-selected-trimmed', label: 'Compress Selected → Trimmed', shortcut: '', category: 'Edit' },
+    { id: 'compress-selected-summarized', label: 'Compress Selected → Summarized', shortcut: '', category: 'Edit' },
+    { id: 'move-selected-primacy', label: 'Move Selected → Primacy', shortcut: '', category: 'Edit' },
+    { id: 'move-selected-middle', label: 'Move Selected → Middle', shortcut: '', category: 'Edit' },
+    { id: 'move-selected-recency', label: 'Move Selected → Recency', shortcut: '', category: 'Edit' },
+
+    // Data
+    { id: 'snapshot', label: 'Save Snapshot', shortcut: 'S', category: 'Data' },
+    { id: 'load-demo', label: 'Load Demo Data', shortcut: '', category: 'Data' },
+    { id: 'clear-all-blocks', label: 'Clear All Blocks', shortcut: '', category: 'Data' },
   ];
 
   let filteredCommands = $derived(

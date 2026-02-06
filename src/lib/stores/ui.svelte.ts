@@ -149,27 +149,75 @@ function closeCompressionSlider(): void {
 // ============================================================================
 
 function toggleSidebar(): void {
-  sidebarCollapsed = !sidebarCollapsed;
+  if (sidebarCollapsed) {
+    // Expand: restore pre-collapse width
+    sidebarCollapsed = false;
+    sidebarWidth = preCollapseWidth;
+    localStorage.setItem('aperture-sidebar-collapsed', 'false');
+    localStorage.setItem('aperture-sidebar-width', sidebarWidth.toString());
+  } else {
+    // Collapse: save current width then collapse
+    preCollapseWidth = sidebarWidth;
+    localStorage.setItem('aperture-sidebar-width-before-collapse', preCollapseWidth.toString());
+    sidebarCollapsed = true;
+    sidebarWidth = COLLAPSED_SIDEBAR_WIDTH;
+    localStorage.setItem('aperture-sidebar-collapsed', 'true');
+  }
+}
+
+function expandAllZones(): void {
+  collapsedZones = new Set();
+}
+
+function collapseAllZonesFrom(zoneIds: string[]): void {
+  collapsedZones = new Set(zoneIds);
 }
 
 // ============================================================================
 // Sidebar Width Actions
 // ============================================================================
 
-const MIN_SIDEBAR_WIDTH = 180;
+const MIN_SIDEBAR_WIDTH = 200;
 const MAX_SIDEBAR_WIDTH = 400;
+const COLLAPSED_SIDEBAR_WIDTH = 36;
+const COLLAPSE_THRESHOLD = 90;
+let preCollapseWidth = $state(220); // Width to restore when expanding
 
 function setSidebarWidth(width: number): void {
+  // Snap to collapsed if below threshold
+  if (width < COLLAPSE_THRESHOLD) {
+    if (!sidebarCollapsed) {
+      preCollapseWidth = Math.max(MIN_SIDEBAR_WIDTH, sidebarWidth);
+      localStorage.setItem('aperture-sidebar-width-before-collapse', preCollapseWidth.toString());
+    }
+    sidebarCollapsed = true;
+    sidebarWidth = COLLAPSED_SIDEBAR_WIDTH;
+    localStorage.setItem('aperture-sidebar-collapsed', 'true');
+    return;
+  }
+  sidebarCollapsed = false;
   sidebarWidth = Math.max(MIN_SIDEBAR_WIDTH, Math.min(MAX_SIDEBAR_WIDTH, width));
   localStorage.setItem('aperture-sidebar-width', sidebarWidth.toString());
+  localStorage.setItem('aperture-sidebar-collapsed', 'false');
 }
 
 function initSidebarWidth(): void {
+  const storedCollapsed = localStorage.getItem('aperture-sidebar-collapsed');
+  const storedPreCollapse = localStorage.getItem('aperture-sidebar-width-before-collapse');
+  if (storedPreCollapse) {
+    const val = parseInt(storedPreCollapse, 10);
+    if (!isNaN(val)) preCollapseWidth = val;
+  }
+  if (storedCollapsed === 'true') {
+    sidebarCollapsed = true;
+    sidebarWidth = COLLAPSED_SIDEBAR_WIDTH;
+    return;
+  }
   const stored = localStorage.getItem('aperture-sidebar-width');
   if (stored) {
     const value = parseInt(stored, 10);
     if (!isNaN(value)) {
-      setSidebarWidth(value);
+      sidebarWidth = Math.max(MIN_SIDEBAR_WIDTH, Math.min(MAX_SIDEBAR_WIDTH, value));
     }
   }
 }
@@ -252,6 +300,12 @@ export const uiStore = {
   get maxSidebarWidth() {
     return MAX_SIDEBAR_WIDTH;
   },
+  get collapsedSidebarWidth() {
+    return COLLAPSED_SIDEBAR_WIDTH;
+  },
+  get collapseThreshold() {
+    return COLLAPSE_THRESHOLD;
+  },
   get density() {
     return density;
   },
@@ -273,6 +327,8 @@ export const uiStore = {
   // Zones
   toggleZoneCollapse,
   isZoneCollapsed,
+  expandAllZones,
+  collapseAllZonesFrom,
 
   // Toasts
   showToast,
