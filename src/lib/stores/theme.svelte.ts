@@ -569,6 +569,63 @@ function set(mode: 'light' | 'dark'): void {
 }
 
 // ============================================================================
+// xterm.js Theme Mapping
+// ============================================================================
+
+export interface XtermTheme {
+  background: string;
+  foreground: string;
+  cursor: string;
+  cursorAccent: string;
+  selectionBackground: string;
+  selectionForeground: string;
+  black: string;
+  red: string;
+  green: string;
+  yellow: string;
+  blue: string;
+  magenta: string;
+  cyan: string;
+  white: string;
+  brightBlack: string;
+  brightRed: string;
+  brightGreen: string;
+  brightYellow: string;
+  brightBlue: string;
+  brightMagenta: string;
+  brightCyan: string;
+  brightWhite: string;
+}
+
+function getXtermTheme(): XtermTheme {
+  const c = getEffectiveColors();
+  return {
+    background: c.bgBase,
+    foreground: c.textPrimary,
+    cursor: c.textPrimary,
+    cursorAccent: c.bgBase,
+    selectionBackground: c.bgHover,
+    selectionForeground: c.textPrimary,
+    black: c.bgBase,
+    red: c.semanticDanger,
+    green: c.semanticSuccess,
+    yellow: c.semanticWarning,
+    blue: c.roleUser,
+    magenta: c.roleSystem,
+    cyan: c.accent,
+    white: c.textPrimary,
+    brightBlack: c.textMuted,
+    brightRed: c.semanticDanger,
+    brightGreen: c.semanticSuccess,
+    brightYellow: c.semanticWarning,
+    brightBlue: c.roleUser,
+    brightMagenta: c.roleSystem,
+    brightCyan: c.accent,
+    brightWhite: c.textPrimary,
+  };
+}
+
+// ============================================================================
 // Export Store Interface
 // ============================================================================
 
@@ -590,4 +647,5 @@ export const themeStore = {
   deleteCustomPreset,
   toggle,
   set,
+  getXtermTheme,
 };

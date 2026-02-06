@@ -6,6 +6,7 @@
 //! credentials pass through transparently.
 
 pub mod proxy;
+pub mod terminal;
 
 use std::env;
 use tracing::{error, info};
@@ -85,7 +86,15 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![get_proxy_address, is_proxy_running])
+        .manage(terminal::TerminalState::new())
+        .invoke_handler(tauri::generate_handler![
+            get_proxy_address,
+            is_proxy_running,
+            terminal::spawn_shell,
+            terminal::send_input,
+            terminal::resize_terminal,
+            terminal::kill_session,
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

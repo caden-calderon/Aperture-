@@ -675,11 +675,96 @@ make test-ui     # Frontend tests
 
 ---
 
+### 2026-02-05: Embedded Terminal — Full Implementation
+
+**Completed all 5 milestones of the terminal plan:**
+
+#### Milestone 1: Rust PTY Backend
+- [x] Added `portable-pty` and `uuid` deps to `src-tauri/Cargo.toml`
+- [x] Created `src-tauri/src/terminal/` module:
+  - `error.rs` — `TerminalError` enum (SpawnFailed, SessionNotFound, WriteFailed, ResizeFailed)
+  - `session.rs` — `TerminalSession` with `Arc<Mutex<MasterPty>>` for resize, reader thread emits `terminal:output`/`terminal:exit` events
+  - `mod.rs` — `TerminalState` + 4 Tauri commands: `spawn_shell`, `send_input`, `resize_terminal`, `kill_session`
+- [x] Wired into `src-tauri/src/lib.rs` with `.manage()` and `invoke_handler`
+- [x] Added `core:event:default` capability
+
+#### Milestone 2: xterm.js Terminal Component
+- [x] Installed `@xterm/xterm`, `@xterm/addon-fit`, `@xterm/addon-web-links`
+- [x] Created `terminal.svelte.ts` store (sessionId, isVisible, height/width, position, persistence)
+- [x] Created `Terminal.svelte` — xterm.js wrapper with PTY spawn, resize, theme sync
+- [x] Created `TerminalPanel.svelte` — header chrome with clear/position/close buttons
+- [x] Integrated into `+page.svelte` with split resize handle (rAF + direct DOM pattern)
+
+#### Milestone 3: Theme Integration
+- [x] Added `getXtermTheme()` to `theme.svelte.ts` — maps ThemeColors to xterm ITheme (16 ANSI colors)
+- [x] Reactive theme update via `$effect` in page
+
+#### Milestone 4: Terminal Position Toggle (bottom/right)
+- [x] Bottom/right position with flex-direction swap
+- [x] 4 command palette entries: toggle-terminal (⌃T), position-bottom, position-right, clear
+- [x] Split handle cursor changes per orientation
+
+#### Milestone 5: Polish + User Feedback Fixes
+- [x] **Ctrl+T** binding (changed from Ctrl+`) with focus toggle
+- [x] **Terminal resize fix** — xterm-screen 100% sizing, reduced debounce (50ms)
+- [x] **Removed size caps** — terminal can be as large as needed
+- [x] **Snap-to-collapse** — MIN_USABLE_HEIGHT=120, MIN_USABLE_WIDTH=180, snaps to COLLAPSED_SIZE=28
+- [x] **Collapsed bar** — `>_` SVG icon + "Terminal" label (horizontal), icon only (vertical)
+- [x] **Fixed icons** — Eraser SVG for clear, X for close (were both X's)
+- [x] **xterm CSS fix** — Moved import to `app.css` (Tailwind choked on it in Svelte script)
+- [x] **Collapsible context panel** — Thin bar with document icon + "Context" + block count
+- [x] **Context panel minimize** button (—) in toolbar
+- [x] **beforeunload** cleanup for terminal session
+- [x] **Reconnect on Enter** after process exit
+
+**New Files Created:**
+- `src-tauri/src/terminal/error.rs`
+- `src-tauri/src/terminal/session.rs`
+- `src-tauri/src/terminal/mod.rs`
+- `src/lib/components/Terminal.svelte`
+- `src/lib/components/TerminalPanel.svelte`
+- `src/lib/stores/terminal.svelte.ts`
+
+**Files Modified:**
+- `src-tauri/Cargo.toml` — portable-pty, uuid deps
+- `src-tauri/capabilities/default.json` — core:event:default
+- `src-tauri/src/lib.rs` — terminal module, state, commands
+- `src/app.css` — xterm.css import
+- `src/lib/components/CommandPalette.svelte` — 5 new terminal + context commands
+- `src/lib/components/index.ts` — Terminal, TerminalPanel exports
+- `src/lib/stores/index.ts` — terminalStore export
+- `src/lib/stores/theme.svelte.ts` — XtermTheme, getXtermTheme()
+- `src/lib/stores/ui.svelte.ts` — contextPanelCollapsed, toggle/init
+- `src/routes/+page.svelte` — terminal layout, split resize, collapsed context bar
+- `package.json` / `package-lock.json` — xterm dependencies
+
+**Component summary (18 total):**
+| Component | Purpose |
+|-----------|---------|
+| `TokenBudgetBar` | Token usage with canvas halftone |
+| `Zone` | Collapsible zone containers with resize, zone/content expand |
+| `ContextBlock` | Individual blocks with per-block collapse, content expand |
+| `Modal` | Block detail modal with edit mode, expandable content |
+| `Toast` | Notification toasts |
+| `CanvasOverlay` | Generic canvas effects layer |
+| `CommandPalette` | Ctrl+K quick actions (expanded with terminal commands) |
+| `ThemeToggle` | Light/dark mode toggle |
+| `ThemeCustomizer` | Full theme editor with 13 presets |
+| `DensityControl` | UI scale slider |
+| `TitleBar` | Custom window title bar |
+| `BlockTypeManager` | Manage block types (built-in + custom) |
+| `ZoneManager` | Manage zones (built-in + custom) |
+| **`Terminal`** | **xterm.js wrapper — PTY spawn, resize, theme** |
+| **`TerminalPanel`** | **Terminal chrome — collapsed/expanded, clear/position/close** |
+
+**Verification:** `svelte-check` 0 errors 0 warnings, `cargo clippy` clean.
+
+---
+
 ### Next Session TODO
 
 - [ ] Test all features in `npm run tauri dev` (full desktop app)
-- [ ] Horizontal zone resize (for future right sidebar)
 - [ ] Performance check with many blocks
-- [ ] User's UI additions and fixes
+- [ ] User's UI additions/fixes
 
-**Phase 0 status: ~98% COMPLETE** — All core features implemented, persistence working
+**Phase 0 status: ~99% COMPLETE** — All core features + embedded terminal implemented

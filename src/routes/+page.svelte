@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { TokenBudgetBar, Zone, Modal, Toast, CommandPalette, ThemeToggle, DensityControl, TitleBar, ThemeCustomizer, BlockTypeManager, ZoneManager, SearchBar } from "$lib/components";
-  import { contextStore, selectionStore, uiStore, themeStore, blockTypesStore, zonesStore, searchStore } from "$lib/stores";
+  import { TokenBudgetBar, Zone, Modal, Toast, CommandPalette, ThemeToggle, DensityControl, TitleBar, ThemeCustomizer, BlockTypeManager, ZoneManager, SearchBar, TerminalPanel } from "$lib/components";
+  import { contextStore, selectionStore, uiStore, themeStore, blockTypesStore, zonesStore, searchStore, terminalStore } from "$lib/stores";
   import type { Zone as ZoneType, Block } from "$lib/types";
 
   // Sidebar resize state
@@ -15,6 +15,14 @@
   let resizingZoneId = $state<string | null>(null);
   let zoneResizeStartY = $state(0);
   let zoneResizeStartHeight = $state(0);
+
+  // Terminal split resize state
+  let isResizingTerminal = $state(false);
+  let termResizeStart = $state(0);
+  let termResizeStartSize = $state(0);
+  let termResizeRaf = $state<number | null>(null);
+  let terminalPanelRef = $state<HTMLElement | null>(null);
+  let terminalPanelComponentRef = $state<ReturnType<typeof TerminalPanel> | null>(null);
 
   // Initialize stores on mount
   onMount(() => {
@@ -33,8 +41,40 @@
     // Initialize zones store
     zonesStore.init();
 
+    // Initialize context panel state
+    uiStore.initContextPanel();
+
+    // Initialize terminal store
+    terminalStore.init();
+
     // Load persisted blocks or demo data
     contextStore.init();
+
+    // Cleanup terminal session on window close
+    const handleBeforeUnload = () => {
+      const sid = terminalStore.sessionId;
+      if (sid) {
+        // Use navigator.sendBeacon-style sync cleanup isn't possible with Tauri IPC,
+        // but invoke is async. Fire-and-forget is the best we can do.
+        import("@tauri-apps/api/core").then(({ invoke }) => {
+          invoke('kill_session', { sessionId: sid }).catch(() => {});
+        });
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  });
+
+  // Reactively update terminal theme when theme changes
+  $effect(() => {
+    // Track theme changes
+    void themeStore.currentPresetId;
+    void themeStore.customColors;
+    // Update terminal if visible
+    terminalPanelComponentRef?.updateTheme();
   });
 
   // Sidebar resize handlers — uses rAF + direct DOM for smooth resize
@@ -122,8 +162,80 @@
     document.body.style.userSelect = '';
   }
 
+  // Terminal split resize handlers — rAF + direct DOM
+  function handleTermResizeStart(e: MouseEvent) {
+    e.preventDefault();
+    isResizingTerminal = true;
+    const isBottom = terminalStore.position === 'bottom';
+    termResizeStart = isBottom ? e.clientY : e.clientX;
+    termResizeStartSize = isBottom ? terminalStore.terminalHeight : terminalStore.terminalWidth;
+    document.body.style.cursor = isBottom ? 'row-resize' : 'col-resize';
+    document.body.style.userSelect = 'none';
+    document.documentElement.classList.add('is-resizing');
+  }
+
+  function handleTermResizeMove(e: MouseEvent) {
+    if (!isResizingTerminal) return;
+    if (termResizeRaf) cancelAnimationFrame(termResizeRaf);
+    termResizeRaf = requestAnimationFrame(() => {
+      const isBottom = terminalStore.position === 'bottom';
+      // Invert delta: dragging up/left should increase size
+      const delta = isBottom
+        ? termResizeStart - e.clientY
+        : termResizeStart - e.clientX;
+      const newSize = Math.max(terminalStore.collapsedSize, termResizeStartSize + delta);
+      if (terminalPanelRef) {
+        if (isBottom) {
+          terminalPanelRef.style.height = `${newSize}px`;
+        } else {
+          terminalPanelRef.style.width = `${newSize}px`;
+        }
+      }
+    });
+  }
+
+  function handleTermResizeEnd() {
+    if (!isResizingTerminal) return;
+    if (termResizeRaf) cancelAnimationFrame(termResizeRaf);
+    if (terminalPanelRef) {
+      const isBottom = terminalStore.position === 'bottom';
+      if (isBottom) {
+        const finalHeight = parseInt(terminalPanelRef.style.height) || terminalStore.terminalHeight;
+        terminalStore.setHeight(finalHeight);
+        terminalPanelRef.style.height = `${terminalStore.terminalHeight}px`;
+      } else {
+        const finalWidth = parseInt(terminalPanelRef.style.width) || terminalStore.terminalWidth;
+        terminalStore.setWidth(finalWidth);
+        terminalPanelRef.style.width = `${terminalStore.terminalWidth}px`;
+      }
+    }
+    isResizingTerminal = false;
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+    document.documentElement.classList.remove('is-resizing');
+  }
+
   // Keyboard shortcuts
   function handleKeydown(e: KeyboardEvent) {
+    // Ctrl+T toggles terminal, even from inputs
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "t") {
+      e.preventDefault();
+      // If terminal is visible and focused, hide it. If visible but not focused, focus it.
+      // If hidden, show and focus it.
+      if (terminalStore.isVisible) {
+        const termEl = terminalPanelRef?.querySelector('.xterm-helper-textarea');
+        if (termEl && document.activeElement === termEl) {
+          terminalStore.hide();
+        } else {
+          requestAnimationFrame(() => terminalPanelComponentRef?.focusTerminal());
+        }
+      } else {
+        terminalStore.show();
+        requestAnimationFrame(() => terminalPanelComponentRef?.focusTerminal());
+      }
+      return;
+    }
+
     // Ctrl+F always opens search, even from inputs
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "f") {
       e.preventDefault();
@@ -304,6 +416,9 @@
       case 'toggle-sidebar':
         uiStore.toggleSidebar();
         break;
+      case 'toggle-context-panel':
+        uiStore.toggleContextPanel();
+        break;
       case 'expand-all-zones': {
         uiStore.expandAllZones();
         // Also expand all zone heights
@@ -432,6 +547,25 @@
         }
         break;
 
+      // Terminal
+      case 'toggle-terminal':
+        terminalStore.toggle();
+        if (terminalStore.isVisible) {
+          requestAnimationFrame(() => terminalPanelComponentRef?.focusTerminal());
+        }
+        break;
+      case 'terminal-position-bottom':
+        terminalStore.setPosition('bottom');
+        if (!terminalStore.isVisible) terminalStore.show();
+        break;
+      case 'terminal-position-right':
+        terminalStore.setPosition('right');
+        if (!terminalStore.isVisible) terminalStore.show();
+        break;
+      case 'terminal-clear':
+        terminalPanelComponentRef?.clearTerminal();
+        break;
+
       // Data
       case 'snapshot': {
         const snap = contextStore.saveSnapshot(`Snapshot ${contextStore.snapshots.length + 1}`);
@@ -457,8 +591,8 @@
 
 <svelte:window
   on:keydown={handleKeydown}
-  on:mousemove={(e) => { handleResizeMove(e); handleZoneResizeMove(e); }}
-  on:mouseup={() => { handleResizeEnd(); handleZoneResizeEnd(); }}
+  on:mousemove={(e) => { handleResizeMove(e); handleZoneResizeMove(e); handleTermResizeMove(e); }}
+  on:mouseup={() => { handleResizeEnd(); handleZoneResizeEnd(); handleTermResizeEnd(); }}
 />
 
 <div class="app">
@@ -555,6 +689,7 @@
             <div class="shortcut"><kbd>⌘K</kbd> Commands</div>
             <div class="shortcut"><kbd>⌘[</kbd> Sidebar</div>
             <div class="shortcut"><kbd>⌘F</kbd> Search</div>
+            <div class="shortcut"><kbd>⌃T</kbd> Terminal</div>
           </div>
         </section>
       {/if}
@@ -576,65 +711,107 @@
     </div>
 
     <!-- Content -->
-    <div class="content">
-      <!-- Toolbar -->
-      <div class="toolbar">
-        <div class="toolbar-info">
-          <strong>{selectionStore.count}</strong> selected
-          <span class="toolbar-sep">·</span>
-          <strong>{formatNumber(selectionStore.selectedTokens)}</strong> tokens
-        </div>
-        <div class="toolbar-actions">
-          <button class="btn btn-sm" onclick={() => searchStore.toggle()} title="Search (Ctrl+F)">
-            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="6.5" cy="6.5" r="5"/><line x1="10.5" y1="10.5" x2="15" y2="15"/></svg>
-          </button>
-          <button class="btn btn-sm" onclick={() => selectionStore.selectAll()}>Select All</button>
-          <button class="btn btn-sm" onclick={() => selectionStore.deselect()}>Clear</button>
-          <button
-            class="btn btn-sm btn-danger"
-            disabled={!selectionStore.hasSelection}
-            onclick={() => {
-              const count = selectionStore.count;
-              contextStore.removeBlocks([...selectionStore.selectedIds]);
-              selectionStore.deselect();
-              uiStore.showToast(`Removed ${count} block(s)`, "success");
-            }}
-          >
-            Remove
-          </button>
-        </div>
-      </div>
+    <div class="content" class:content-right={terminalStore.isVisible && terminalStore.position === 'right'}>
+      {#if uiStore.contextPanelCollapsed}
+        <!-- Context panel collapsed bar -->
+        <button class="context-collapsed" onclick={() => uiStore.toggleContextPanel()} title="Expand context panel">
+          <svg class="context-collapsed-icon" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="2" width="12" height="12" rx="1" />
+            <line x1="5" y1="6" x2="11" y2="6" />
+            <line x1="5" y1="10" x2="9" y2="10" />
+          </svg>
+          <span class="context-collapsed-label">Context</span>
+          <span class="context-collapsed-count">{contextStore.blocks.length}</span>
+        </button>
+      {:else}
+        <div class="content-main">
+          <!-- Toolbar -->
+          <div class="toolbar">
+            <div class="toolbar-info">
+              <strong>{selectionStore.count}</strong> selected
+              <span class="toolbar-sep">·</span>
+              <strong>{formatNumber(selectionStore.selectedTokens)}</strong> tokens
+            </div>
+            <div class="toolbar-actions">
+              <button class="btn btn-sm" onclick={() => uiStore.toggleContextPanel()} title="Collapse context panel">
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+                  <line x1="3" y1="8" x2="13" y2="8" />
+                </svg>
+              </button>
+              <button class="btn btn-sm" onclick={() => searchStore.toggle()} title="Search (Ctrl+F)">
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="6.5" cy="6.5" r="5"/><line x1="10.5" y1="10.5" x2="15" y2="15"/></svg>
+              </button>
+              <button class="btn btn-sm" onclick={() => selectionStore.selectAll()}>Select All</button>
+              <button class="btn btn-sm" onclick={() => selectionStore.deselect()}>Clear</button>
+              <button
+                class="btn btn-sm btn-danger"
+                disabled={!selectionStore.hasSelection}
+                onclick={() => {
+                  const count = selectionStore.count;
+                  contextStore.removeBlocks([...selectionStore.selectedIds]);
+                  selectionStore.deselect();
+                  uiStore.showToast(`Removed ${count} block(s)`, "success");
+                }}
+              >
+                Remove
+              </button>
+            </div>
+          </div>
 
-      <!-- Search Bar -->
-      <SearchBar />
+          <!-- Search Bar -->
+          <SearchBar />
 
-      <!-- Zones -->
-      <div class="zones" class:resizing={resizingZoneId !== null}>
-        {#each zonesStore.zonesByDisplayOrder as zoneConfig (zoneConfig.id)}
-          <Zone
-            zone={zoneConfig.id as ZoneType}
-            blocks={contextStore.blocksByZone[zoneConfig.id] ?? []}
-            collapsed={uiStore.isZoneCollapsed(zoneConfig.id)}
-            selectedIds={selectionStore.selectedIds}
-            draggingBlockIds={uiStore.draggingBlockIds}
-            height={zonesStore.getZoneHeight(zoneConfig.id)}
-            expanded={zonesStore.isZoneExpanded(zoneConfig.id)}
-            contentExpanded={zonesStore.isContentExpanded(zoneConfig.id)}
-            isResizing={resizingZoneId === zoneConfig.id}
-            onToggleCollapse={() => handleToggleZoneCollapse(zoneConfig.id as ZoneType)}
-            onToggleExpanded={() => { if (!resizingZoneId) zonesStore.toggleZoneExpanded(zoneConfig.id); }}
-            onToggleContentExpanded={() => zonesStore.toggleContentExpanded(zoneConfig.id)}
-            onBlockSelect={handleBlockSelect}
-            onBlockDoubleClick={handleBlockDoubleClick}
-            onBlockDragStart={handleBlockDragStart}
-            onBlockDragEnd={handleBlockDragEnd}
-            onDrop={handleZoneDrop}
-            onCreateBlock={handleCreateBlock}
-            onReorder={handleZoneReorder}
-            onResizeStart={(e, h) => handleZoneResizeStart(e, zoneConfig.id, h)}
-          />
-        {/each}
-      </div>
+          <!-- Zones -->
+          <div class="zones" class:resizing={resizingZoneId !== null}>
+            {#each zonesStore.zonesByDisplayOrder as zoneConfig (zoneConfig.id)}
+              <Zone
+                zone={zoneConfig.id as ZoneType}
+                blocks={contextStore.blocksByZone[zoneConfig.id] ?? []}
+                collapsed={uiStore.isZoneCollapsed(zoneConfig.id)}
+                selectedIds={selectionStore.selectedIds}
+                draggingBlockIds={uiStore.draggingBlockIds}
+                height={zonesStore.getZoneHeight(zoneConfig.id)}
+                expanded={zonesStore.isZoneExpanded(zoneConfig.id)}
+                contentExpanded={zonesStore.isContentExpanded(zoneConfig.id)}
+                isResizing={resizingZoneId === zoneConfig.id}
+                onToggleCollapse={() => handleToggleZoneCollapse(zoneConfig.id as ZoneType)}
+                onToggleExpanded={() => { if (!resizingZoneId) zonesStore.toggleZoneExpanded(zoneConfig.id); }}
+                onToggleContentExpanded={() => zonesStore.toggleContentExpanded(zoneConfig.id)}
+                onBlockSelect={handleBlockSelect}
+                onBlockDoubleClick={handleBlockDoubleClick}
+                onBlockDragStart={handleBlockDragStart}
+                onBlockDragEnd={handleBlockDragEnd}
+                onDrop={handleZoneDrop}
+                onCreateBlock={handleCreateBlock}
+                onReorder={handleZoneReorder}
+                onResizeStart={(e, h) => handleZoneResizeStart(e, zoneConfig.id, h)}
+              />
+            {/each}
+          </div>
+        </div>
+      {/if}
+
+      <!-- Terminal Split Handle + Panel -->
+      {#if terminalStore.isVisible}
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <div
+          class="terminal-split-handle"
+          class:terminal-split-vertical={terminalStore.position === 'right'}
+          class:active={isResizingTerminal}
+          onmousedown={handleTermResizeStart}
+        ></div>
+
+        <div
+          class="terminal-panel-wrapper"
+          class:terminal-panel-right={terminalStore.position === 'right'}
+          bind:this={terminalPanelRef}
+          style={terminalStore.position === 'bottom'
+            ? `height: ${terminalStore.terminalHeight}px`
+            : `width: ${terminalStore.terminalWidth}px`}
+        >
+          <TerminalPanel bind:this={terminalPanelComponentRef} />
+        </div>
+      {/if}
     </div>
   </main>
 </div>
@@ -975,6 +1152,77 @@
     background: var(--bg-base);
   }
 
+  .content.content-right {
+    flex-direction: row;
+  }
+
+  .content-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-height: 0;
+    min-width: 0;
+  }
+
+  /* Context panel collapsed bar */
+  .context-collapsed {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    background: var(--bg-surface);
+    border: none;
+    border-bottom: 1px solid var(--border-subtle);
+    cursor: pointer;
+    transition: background 0.1s ease;
+    padding: 6px 12px;
+    flex-shrink: 0;
+    width: 100%;
+  }
+
+  /* When terminal is on right, context collapsed bar should be vertical */
+  .content.content-right .context-collapsed {
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    width: auto;
+    height: 100%;
+    padding: 12px 6px;
+    border-bottom: none;
+    border-right: 1px solid var(--border-subtle);
+    flex-direction: column;
+  }
+
+  .context-collapsed:hover {
+    background: var(--bg-hover);
+  }
+
+  .context-collapsed:hover .context-collapsed-icon {
+    color: var(--text-primary);
+  }
+
+  .context-collapsed-icon {
+    color: var(--text-muted);
+    flex-shrink: 0;
+    transition: color 0.1s ease;
+  }
+
+  .context-collapsed-label {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .context-collapsed-count {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--text-faint);
+    font-variant-numeric: tabular-nums;
+  }
+
   /* Toolbar */
   .toolbar {
     display: flex;
@@ -1039,5 +1287,37 @@
   .zones.resizing {
     user-select: none;
     cursor: row-resize;
+  }
+
+  /* Terminal split handle */
+  .terminal-split-handle {
+    height: 4px;
+    cursor: row-resize;
+    background: transparent;
+    transition: background 0.15s ease;
+    flex-shrink: 0;
+  }
+
+  .terminal-split-handle.terminal-split-vertical {
+    height: auto;
+    width: 4px;
+    cursor: col-resize;
+  }
+
+  .terminal-split-handle:hover,
+  .terminal-split-handle.active {
+    background: var(--accent);
+  }
+
+  /* Terminal panel wrapper */
+  .terminal-panel-wrapper {
+    flex-shrink: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .terminal-panel-wrapper.terminal-panel-right {
+    height: 100%;
   }
 </style>

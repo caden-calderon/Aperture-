@@ -16,3 +16,5 @@ export { default as ThemeCustomizer } from "./ThemeCustomizer.svelte";
 export { default as BlockTypeManager } from "./BlockTypeManager.svelte";
 export { default as ZoneManager } from "./ZoneManager.svelte";
 export { default as SearchBar } from "./SearchBar.svelte";
+export { default as Terminal } from "./Terminal.svelte";
+export { default as TerminalPanel } from "./TerminalPanel.svelte";

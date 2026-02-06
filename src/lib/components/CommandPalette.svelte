@@ -14,6 +14,7 @@
   const commands = [
     // View
     { id: 'toggle-sidebar', label: 'Toggle Sidebar', shortcut: '⌘[', category: 'View' },
+    { id: 'toggle-context-panel', label: 'Toggle Context Panel', shortcut: '', category: 'View' },
     { id: 'expand-all-zones', label: 'Expand All Zones', shortcut: '', category: 'View' },
     { id: 'collapse-all-zones', label: 'Collapse All Zones', shortcut: '', category: 'View' },
     { id: 'toggle-primacy', label: 'Toggle Primacy Zone', shortcut: '', category: 'View' },
@@ -40,6 +41,12 @@
     { id: 'move-selected-primacy', label: 'Move Selected → Primacy', shortcut: '', category: 'Edit' },
     { id: 'move-selected-middle', label: 'Move Selected → Middle', shortcut: '', category: 'Edit' },
     { id: 'move-selected-recency', label: 'Move Selected → Recency', shortcut: '', category: 'Edit' },
+
+    // Terminal
+    { id: 'toggle-terminal', label: 'Toggle Terminal', shortcut: '⌃T', category: 'Terminal' },
+    { id: 'terminal-position-bottom', label: 'Terminal: Bottom', shortcut: '', category: 'Terminal' },
+    { id: 'terminal-position-right', label: 'Terminal: Right', shortcut: '', category: 'Terminal' },
+    { id: 'terminal-clear', label: 'Terminal: Clear', shortcut: '', category: 'Terminal' },
 
     // Data
     { id: 'snapshot', label: 'Save Snapshot', shortcut: 'S', category: 'Data' },

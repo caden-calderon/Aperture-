@@ -9,3 +9,4 @@ export { themeStore } from "./theme.svelte";
 export { blockTypesStore, type BlockType } from "./blockTypes.svelte";
 export { zonesStore, type ZoneConfig } from "./zones.svelte";
 export { searchStore, type SearchMatch } from "./search.svelte";
+export { terminalStore, type TerminalPosition } from "./terminal.svelte";

@@ -29,6 +29,7 @@ let collapsedZones = $state(new Set<string>());
 let compressionSliderOpen = $state(false);
 let sidebarCollapsed = $state(false);
 let sidebarWidth = $state(220); // Default width in pixels
+let contextPanelCollapsed = $state(false);
 
 // Density: 0.8 = compact, 1.0 = normal, 1.2 = comfortable
 let density = $state(1.0);
@@ -165,6 +166,21 @@ function toggleSidebar(): void {
   }
 }
 
+function toggleContextPanel(): void {
+  contextPanelCollapsed = !contextPanelCollapsed;
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem('aperture-context-panel-collapsed', JSON.stringify(contextPanelCollapsed));
+  }
+}
+
+function initContextPanel(): void {
+  if (typeof localStorage === 'undefined') return;
+  const stored = localStorage.getItem('aperture-context-panel-collapsed');
+  if (stored) {
+    try { contextPanelCollapsed = JSON.parse(stored); } catch {}
+  }
+}
+
 function expandAllZones(): void {
   collapsedZones = new Set();
 }
@@ -291,6 +307,9 @@ export const uiStore = {
   get sidebarCollapsed() {
     return sidebarCollapsed;
   },
+  get contextPanelCollapsed() {
+    return contextPanelCollapsed;
+  },
   get sidebarWidth() {
     return sidebarWidth;
   },
@@ -342,6 +361,10 @@ export const uiStore = {
   toggleSidebar,
   setSidebarWidth,
   initSidebarWidth,
+
+  // Context Panel
+  toggleContextPanel,
+  initContextPanel,
 
   // Density
   setDensity,
