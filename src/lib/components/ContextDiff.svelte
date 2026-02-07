@@ -7,7 +7,8 @@
   import { untrack } from "svelte";
   import type { Block } from "$lib/types";
   import { contextStore, zonesStore, blockTypesStore } from "$lib/stores";
-  import { diffLines, diffStats, type DiffLine } from "$lib/utils/diff";
+  import { diffLines, type DiffLine } from "$lib/utils/diff";
+  import { getPreview } from "$lib/utils/text";
 
   interface Props {
     open?: boolean;
@@ -230,11 +231,6 @@
     return roleColors[block.role] ?? "var(--text-muted)";
   }
 
-  function truncate(text: string, max: number): string {
-    if (text.length <= max) return text;
-    return text.slice(0, max) + "…";
-  }
-
   function formatDate(date: Date): string {
     return new Date(date).toLocaleString("en-US", {
       month: "short",
@@ -399,7 +395,7 @@
                     class="diff-role-badge"
                     style:--role-color={getBlockColor(block)}
                   >{getBlockLabel(block)}</span>
-                  <span class="diff-preview">{truncate(block.content.replace(/\n/g, " "), 60)}</span>
+                  <span class="diff-preview">{getPreview(block.content.replace(/\n/g, " "), 60)}</span>
                   {#if entry.changes.length > 0}
                     <span class="diff-changes">
                       {entry.changes.join(", ")}

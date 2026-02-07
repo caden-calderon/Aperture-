@@ -2,7 +2,8 @@
   import type { Block } from "$lib/types";
   import { blockTypesStore } from "$lib/stores";
   import { searchStore, type SearchMatch } from "$lib/stores/search.svelte";
-  import { detectLanguage, highlightCode } from "$lib/utils/syntax";
+  import { detectLanguage, highlightCode, escapeHtml } from "$lib/utils/syntax";
+  import { getPreview } from "$lib/utils/text";
 
   interface Props {
     block: Block;
@@ -115,15 +116,6 @@
     return result;
   }
 
-  function escapeHtml(str: string): string {
-    return str
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#039;");
-  }
-
   function handleClick(e: MouseEvent) {
     onSelect?.(block.id, {
       shiftKey: e.shiftKey,
@@ -184,11 +176,6 @@
   function toggleCollapse(e: MouseEvent) {
     e.stopPropagation();
     isCollapsed = !isCollapsed;
-  }
-
-  function getPreview(content: string, maxLength = 180): string {
-    if (content.length <= maxLength) return content;
-    return content.slice(0, maxLength) + "…";
   }
 
   function formatTokens(n: number): string {

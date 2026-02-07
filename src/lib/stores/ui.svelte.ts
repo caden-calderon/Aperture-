@@ -3,6 +3,8 @@
  * Manages UI state: modals, toasts, command palette, drag state
  */
 
+import { SvelteSet } from "svelte/reactivity";
+
 // UI Store types and state
 
 // ============================================================================
@@ -25,7 +27,7 @@ let commandPaletteOpen = $state(false);
 let draggingBlockIds = $state<string[]>([]);
 let dragOverZone = $state<string | null>(null);
 let toasts = $state<Toast[]>([]);
-let collapsedZones = $state(new Set<string>());
+let collapsedZones = $state(new SvelteSet<string>());
 let compressionSliderOpen = $state(false);
 let sidebarCollapsed = $state(false);
 let sidebarWidth = $state(220); // Default width in pixels
@@ -94,13 +96,11 @@ function endDrag(): void {
 // ============================================================================
 
 function toggleZoneCollapse(zone: string): void {
-  const newSet = new Set(collapsedZones);
-  if (newSet.has(zone)) {
-    newSet.delete(zone);
+  if (collapsedZones.has(zone)) {
+    collapsedZones.delete(zone);
   } else {
-    newSet.add(zone);
+    collapsedZones.add(zone);
   }
-  collapsedZones = newSet;
 }
 
 function isZoneCollapsed(zone: string): boolean {
@@ -185,11 +185,14 @@ function initContextPanel(): void {
 }
 
 function expandAllZones(): void {
-  collapsedZones = new Set();
+  collapsedZones.clear();
 }
 
 function collapseAllZonesFrom(zoneIds: string[]): void {
-  collapsedZones = new Set(zoneIds);
+  collapsedZones.clear();
+  for (const id of zoneIds) {
+    collapsedZones.add(id);
+  }
 }
 
 // ============================================================================

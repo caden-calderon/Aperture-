@@ -39,13 +39,15 @@ fn detect_shell() -> String {
 pub fn spawn_shell(
     app: AppHandle,
     state: State<'_, TerminalState>,
+    cols: Option<u16>,
+    rows: Option<u16>,
 ) -> Result<String, TerminalError> {
     let pty_system = native_pty_system();
 
     let pair = pty_system
         .openpty(PtySize {
-            rows: 24,
-            cols: 80,
+            rows: rows.unwrap_or(24),
+            cols: cols.unwrap_or(80),
             pixel_width: 0,
             pixel_height: 0,
         })
@@ -73,8 +75,7 @@ pub fn spawn_shell(
         .map_err(|e| TerminalError::SpawnFailed(e.to_string()))?;
 
     let session_id = Uuid::new_v4().to_string();
-    let session =
-        TerminalSession::new(session_id.clone(), child, writer, pair.master, app);
+    let session = TerminalSession::new(session_id.clone(), child, writer, pair.master, app);
 
     let mut sessions = state
         .sessions
@@ -101,9 +102,7 @@ pub fn send_input(
         .get_mut(&session_id)
         .ok_or_else(|| TerminalError::SessionNotFound(session_id.clone()))?;
 
-    session
-        .write(&data)
-        .map_err(TerminalError::WriteFailed)
+    session.write(&data).map_err(TerminalError::WriteFailed)
 }
 
 #[tauri::command]
@@ -113,6 +112,12 @@ pub fn resize_terminal(
     cols: u16,
     rows: u16,
 ) -> Result<(), TerminalError> {
+    if cols == 0 || rows == 0 || cols > 500 || rows > 500 {
+        return Err(TerminalError::ResizeFailed(format!(
+            "Invalid dimensions: {cols}x{rows} (must be 1-500)"
+        )));
+    }
+
     let sessions = state
         .sessions
         .lock()

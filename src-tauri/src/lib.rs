@@ -49,12 +49,15 @@ fn get_proxy_address() -> String {
     format!("http://127.0.0.1:{}", get_proxy_port())
 }
 
-/// Tauri command: Check if proxy is running.
+/// Tauri command: Check if proxy is running via TCP health check.
 #[tauri::command]
 fn is_proxy_running() -> bool {
-    // For now, just return true if we started it
-    // Later: actual health check
-    true
+    use std::net::{SocketAddr, TcpStream};
+    use std::time::Duration;
+
+    let port = get_proxy_port();
+    let addr: SocketAddr = ([127, 0, 0, 1], port).into();
+    TcpStream::connect_timeout(&addr, Duration::from_millis(500)).is_ok()
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -67,13 +70,17 @@ pub fn run() {
     let port = get_proxy_port();
 
     info!("Starting Aperture");
-    info!(
-        "Transparent proxy mode — tools' API keys pass through, no Aperture key needed"
-    );
+    info!("Transparent proxy mode — tools' API keys pass through, no Aperture key needed");
 
     // Start proxy server in background
     std::thread::spawn(move || {
-        let rt = tokio::runtime::Runtime::new().expect("Failed to create tokio runtime");
+        let rt = match tokio::runtime::Runtime::new() {
+            Ok(rt) => rt,
+            Err(e) => {
+                error!("Failed to create tokio runtime: {}", e);
+                return;
+            }
+        };
         rt.block_on(async move {
             if let Err(e) = proxy::start_proxy(port).await {
                 error!("Proxy server error: {}", e);

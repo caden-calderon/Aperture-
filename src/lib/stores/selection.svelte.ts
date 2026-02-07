@@ -7,13 +7,14 @@
  * - Select all / deselect
  */
 
+import { SvelteSet } from "svelte/reactivity";
 import { contextStore } from "./context.svelte";
 
 // ============================================================================
 // State
 // ============================================================================
 
-let selectedIds = $state(new Set<string>());
+let selectedIds = $state(new SvelteSet<string>());
 let _lastSelectedId = $state<string | null>(null);
 let lastSelectedIndex = $state<number | null>(null);
 let focusedId = $state<string | null>(null);
@@ -37,19 +38,18 @@ const hasSelection = $derived(selectedIds.size > 0);
 // ============================================================================
 
 function select(blockId: string): void {
-  selectedIds = new Set([blockId]);
+  selectedIds.clear();
+  selectedIds.add(blockId);
   _lastSelectedId = blockId;
   lastSelectedIndex = contextStore.getBlockIndex(blockId);
 }
 
 function toggle(blockId: string): void {
-  const newSet = new Set(selectedIds);
-  if (newSet.has(blockId)) {
-    newSet.delete(blockId);
+  if (selectedIds.has(blockId)) {
+    selectedIds.delete(blockId);
   } else {
-    newSet.add(blockId);
+    selectedIds.add(blockId);
   }
-  selectedIds = newSet;
   _lastSelectedId = blockId;
   lastSelectedIndex = contextStore.getBlockIndex(blockId);
 }
@@ -67,27 +67,34 @@ function rangeSelect(blockId: string): void {
   const start = Math.min(lastSelectedIndex, targetIndex);
   const end = Math.max(lastSelectedIndex, targetIndex);
 
-  const newSet = new Set(selectedIds);
   for (let i = start; i <= end; i++) {
-    newSet.add(blocks[i].id);
+    selectedIds.add(blocks[i].id);
   }
-  selectedIds = newSet;
 }
 
 function selectAll(): void {
-  selectedIds = new Set(contextStore.blocks.map((b) => b.id));
+  selectedIds.clear();
+  for (const b of contextStore.blocks) {
+    selectedIds.add(b.id);
+  }
 }
 
 function selectZone(zone: string): void {
   const zoneBlocks = contextStore.blocksByZone[zone] ?? [];
-  selectedIds = new Set(zoneBlocks.map((b) => b.id));
+  selectedIds.clear();
+  for (const b of zoneBlocks) {
+    selectedIds.add(b.id);
+  }
   lastSelectedIndex =
     zoneBlocks.length > 0 ? contextStore.getBlockIndex(zoneBlocks[0].id) : null;
 }
 
 function selectByRole(role: string): void {
   const matchingBlocks = contextStore.blocks.filter((b) => b.role === role);
-  selectedIds = new Set(matchingBlocks.map((b) => b.id));
+  selectedIds.clear();
+  for (const b of matchingBlocks) {
+    selectedIds.add(b.id);
+  }
   lastSelectedIndex =
     matchingBlocks.length > 0
       ? contextStore.getBlockIndex(matchingBlocks[0].id)
@@ -95,7 +102,7 @@ function selectByRole(role: string): void {
 }
 
 function deselect(): void {
-  selectedIds = new Set();
+  selectedIds.clear();
   _lastSelectedId = null;
   lastSelectedIndex = null;
   focusedId = null;

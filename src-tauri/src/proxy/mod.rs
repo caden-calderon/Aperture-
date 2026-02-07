@@ -25,6 +25,9 @@ use self::error::ProxyError;
 /// Default port for the proxy server.
 pub const DEFAULT_PORT: u16 = 5400;
 
+/// Maximum request body size (10 MB).
+const MAX_BODY_SIZE: usize = 10 * 1024 * 1024;
+
 /// Upstream API configuration.
 #[derive(Debug, Clone)]
 pub struct UpstreamConfig {
@@ -92,10 +95,12 @@ pub async fn start_proxy(port: u16) -> Result<(), ProxyError> {
     let addr = format!("127.0.0.1:{port}");
     info!("Starting proxy server on {}", addr);
 
-    let listener = TcpListener::bind(&addr).await.map_err(|e| ProxyError::BindFailed {
-        address: addr.clone(),
-        source: e,
-    })?;
+    let listener = TcpListener::bind(&addr)
+        .await
+        .map_err(|e| ProxyError::BindFailed {
+            address: addr.clone(),
+            source: e,
+        })?;
 
     axum::serve(listener, app)
         .await
@@ -133,11 +138,7 @@ async fn proxy_handler(
         }
         Err(e) => {
             error!("Proxy error: {}", e);
-            (
-                StatusCode::BAD_GATEWAY,
-                format!("Proxy error: {e}"),
-            )
-                .into_response()
+            (StatusCode::BAD_GATEWAY, format!("Proxy error: {e}")).into_response()
         }
     }
 }
@@ -179,7 +180,7 @@ async fn forward_request(
     let (parts, body) = req.into_parts();
 
     // Read body for logging (we'll need to capture this later for context analysis)
-    let body_bytes = axum::body::to_bytes(body, 10 * 1024 * 1024)
+    let body_bytes = axum::body::to_bytes(body, MAX_BODY_SIZE)
         .await
         .map_err(|e| ProxyError::InvalidRequest(e.to_string()))?;
 
@@ -187,7 +188,11 @@ async fn forward_request(
     if !body_bytes.is_empty() {
         let body_preview = String::from_utf8_lossy(&body_bytes);
         let preview = if body_preview.len() > 500 {
-            format!("{}... ({} bytes total)", &body_preview[..500], body_bytes.len())
+            format!(
+                "{}... ({} bytes total)",
+                &body_preview[..500],
+                body_bytes.len()
+            )
         } else {
             body_preview.to_string()
         };
@@ -205,10 +210,7 @@ async fn forward_request(
     }
 
     // Send request
-    let upstream_response = upstream_req
-        .body(body_bytes.to_vec())
-        .send()
-        .await?;
+    let upstream_response = upstream_req.body(body_bytes.to_vec()).send().await?;
 
     let status = upstream_response.status();
     let headers = upstream_response.headers().clone();
@@ -240,7 +242,11 @@ async fn forward_request(
         // Log response body (truncated)
         let body_preview = String::from_utf8_lossy(&response_bytes);
         let preview = if body_preview.len() > 500 {
-            format!("{}... ({} bytes total)", &body_preview[..500], response_bytes.len())
+            format!(
+                "{}... ({} bytes total)",
+                &body_preview[..500],
+                response_bytes.len()
+            )
         } else {
             body_preview.to_string()
         };

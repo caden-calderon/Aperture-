@@ -135,7 +135,7 @@ export function detectLanguage(content: string, role?: string): string | null {
  * Returns HTML string (already escaped by Prism).
  */
 export function highlightCode(content: string, language: string): string {
-  const cacheKey = `${language}:${content.slice(0, 50)}:${content.length}`;
+  const cacheKey = `${language}:${content.slice(0, 100)}:${content.length}`;
   const cached = cache.get(cacheKey);
   if (cached) return cached;
 
@@ -154,7 +154,7 @@ export function highlightCode(content: string, language: string): string {
   return highlighted;
 }
 
-function escapeHtml(str: string): string {
+export function escapeHtml(str: string): string {
   return str
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")

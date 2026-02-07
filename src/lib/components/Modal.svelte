@@ -2,6 +2,7 @@
   import type { Block, Role, Snapshot } from "$lib/types";
   import { blockTypesStore, zonesStore, editHistoryStore } from "$lib/stores";
   import { detectLanguage, highlightCode } from "$lib/utils/syntax";
+  import { getPreview } from "$lib/utils/text";
   import { diffLines, type DiffLine } from "$lib/utils/diff";
 
   interface Props {
@@ -90,7 +91,7 @@
   const modalDetectedLang = $derived(block ? detectLanguage(block.content, block.role) : null);
   const modalSyntaxHtml = $derived.by(() => {
     if (!block || !modalDetectedLang) return null;
-    const text = isEditing ? editContent : (isContentExpanded ? block.content : getPreview(block.content));
+    const text = isEditing ? editContent : (isContentExpanded ? block.content : getPreview(block.content, 400));
     return highlightCode(text, modalDetectedLang);
   });
 
@@ -300,10 +301,6 @@
     });
   }
 
-  function getPreview(content: string): string {
-    if (content.length <= 400) return content;
-    return content.slice(0, 400) + "…";
-  }
 </script>
 
 <svelte:window onkeydown={handleKeydown} />
@@ -448,7 +445,7 @@
               <div class="content-fade"></div>
             {/if}
           {:else}
-            <pre>{isContentExpanded ? block.content : getPreview(block.content)}</pre>
+            <pre>{isContentExpanded ? block.content : getPreview(block.content, 400)}</pre>
             {#if !isContentExpanded && isContentLong}
               <div class="content-fade"></div>
             {/if}

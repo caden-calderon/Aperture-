@@ -22,6 +22,7 @@
   let termResizeStartSize = $state(0);
   let termResizeRaf = $state<number | null>(null);
   let terminalPanelRef = $state<HTMLElement | null>(null);
+  // Svelte 5 component instance type (replaces legacy $$ComponentRef)
   let terminalPanelComponentRef = $state<ReturnType<typeof TerminalPanel> | null>(null);
   let contentRef = $state<HTMLElement | null>(null);
 
