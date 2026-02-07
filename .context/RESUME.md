@@ -950,11 +950,23 @@ make test-ui     # Frontend tests
 - [x] **Verification:** All 10 checks pass (svelte-check, vite build, clippy, fmt, tests, LOC count, import resolution, no anti-patterns)
 - [x] **Fix: structuredClone → $state.snapshot** — `structuredClone()` throws `DataCloneError` on Svelte 5 `$state` proxies, silently breaking all snapshot operations (save, switch, restore). Replaced with `$state.snapshot()` in context store (6 instances) and zones store (5 instances).
 
-**Phase 0.5 status: COMPLETE**
+**Phase 0.5 status: PARTIALLY COMPLETE — code changes done, documentation/remaining items pending**
 
 ---
 
 ### Next Session
 
-- [ ] Begin Phase 1 (Proxy Core)
+**Priority: Finish outstanding items from both Phase 0.5 plans before starting Phase 1.**
+
+Two plan files contain remaining work:
+1. `.context/melodic-sleeping-dragonfly.md` — Phase 0.5 Foundation Hardening plan (Session 2 docs partially done, review remaining items)
+2. `.context/mighty-painting-phoenix.md` — Additional plan with outstanding tasks
+
+**Workflow:**
+1. Read both plan files
+2. Identify and complete all remaining tasks
+3. Update this file when fully done
+4. Then begin Phase 1 (Proxy Core)
+
+**Also pending:**
 - [ ] Test all features in `npm run tauri dev` (full desktop app)
