@@ -99,9 +99,23 @@ The visual interface.
 - Canvas effects (halftone, dithering)
 
 **Key directories:**
-- `src/lib/components/` — Svelte components
-- `src/lib/stores/` — State management
+- `src/lib/components/` — Svelte components (organized into blocks/, layout/, controls/, features/, ui/)
+- `src/lib/composables/` — Handler logic extracted from +page.svelte (resize, keyboard, block ops, modals, commands)
+- `src/lib/stores/` — State management (Svelte 5 rune stores with debounced localStorage persistence)
 - `src/lib/canvas/` — WebGL/Canvas effects
+- `src/lib/utils/` — Shared utilities (text processing, syntax highlighting, diff)
+
+**Embedded Terminal:**
+- Frontend: xterm.js terminal emulator in `Terminal.svelte` / `TerminalPanel.svelte`
+- Backend: portable-pty PTY session management in `src-tauri/src/terminal/`
+- Communication via Tauri IPC commands and events (`terminal:output`, `terminal:exit`)
+- Supports bottom/right positioning, snap-to-collapse, and theme synchronization
+
+**Snapshot Branching System:**
+- Working state + named snapshots with lineage tracking (`parentSnapshotId`)
+- `activeSnapshotId`: null = working state, string = viewing a snapshot
+- Zone state captured/restored alongside block state via `zonesStore.captureState()` / `restoreState()`
+- Context diff view for comparing current state vs any snapshot (added/removed/modified blocks)
 
 ---
 
@@ -133,6 +147,13 @@ The visual interface.
 4. Svelte stores update
 5. Components re-render
 ```
+
+### Store Persistence
+
+Svelte 5 rune stores use debounced localStorage persistence to avoid write thrashing.
+Mutations call `markDirty()` which schedules a flush after 1500ms of inactivity.
+This keeps the UI responsive during rapid state changes (drag operations, bulk edits)
+while ensuring state survives page reloads.
 
 ---
 
@@ -248,38 +269,48 @@ listen('token_count_changed', (event) => { ... });
 ## File Structure
 
 ```
-aperture/
-├── src-tauri/
-│   ├── src/
-│   │   ├── main.rs              # Tauri entry point
-│   │   ├── lib.rs               # Library root
-│   │   ├── proxy/               # HTTP proxy
-│   │   │   ├── mod.rs
-│   │   │   ├── server.rs
-│   │   │   ├── handlers.rs
-│   │   │   └── streaming.rs
-│   │   ├── engine/              # Context engine
-│   │   │   ├── mod.rs
-│   │   │   ├── block.rs
-│   │   │   ├── zone.rs
-│   │   │   └── pipeline.rs
-│   │   ├── adapters/            # Provider adapters
-│   │   │   ├── mod.rs
-│   │   │   ├── claude_code.rs
-│   │   │   └── openai.rs
-│   │   └── commands.rs          # Tauri IPC commands
-│   └── Cargo.toml
-│
-├── src/                         # Svelte frontend
-│   ├── lib/
-│   │   ├── components/
-│   │   ├── stores/
-│   │   ├── canvas/
-│   │   └── types.ts
-│   └── routes/
-│       └── +page.svelte
-│
-└── tests/
+src/
+├── routes/
+│   └── +page.svelte              # Main app page (~100 LOC script + template)
+├── lib/
+│   ├── components/
+│   │   ├── blocks/               # ContextBlock, Zone, Sparkline
+│   │   ├── layout/               # Modal, TerminalPanel, TitleBar, ZoneManager
+│   │   ├── controls/             # CommandPalette, ContextMenu, SearchBar, ThemeToggle, ThemeCustomizer, BlockTypeManager
+│   │   ├── features/             # ContextDiff, Terminal, ZoneMinimap
+│   │   ├── ui/                   # CanvasOverlay, DensityControl, Toast, TokenBudgetBar
+│   │   └── index.ts              # Barrel exports
+│   ├── composables/              # Handler logic extracted from +page.svelte
+│   │   ├── resizable.svelte.ts
+│   │   ├── blockHandlers.svelte.ts
+│   │   ├── modalHandlers.svelte.ts
+│   │   ├── keyboardHandlers.svelte.ts
+│   │   ├── commandHandlers.svelte.ts
+│   │   └── index.ts
+│   ├── stores/                   # Svelte 5 rune stores
+│   ├── utils/                    # Shared utilities (text, syntax, diff)
+│   ├── canvas/                   # Canvas effects (halftone, dissolution)
+│   ├── types.ts                  # TypeScript interfaces
+│   └── mock-data.ts              # Demo data generator
+
+src-tauri/src/
+├── lib.rs                        # Tauri app setup, module registration
+├── main.rs                       # Entry point
+├── proxy/                        # HTTP proxy (axum)
+│   ├── mod.rs                    # Startup, ProxyState, config
+│   ├── handler.rs                # Request routing, forwarding, SSE streaming
+│   └── error.rs                  # ProxyError types
+├── engine/                       # Context engine (Phase 1+)
+│   ├── mod.rs
+│   ├── block.rs                  # Universal Block struct
+│   └── types.rs                  # Role, Zone, CompressionLevel enums
+├── events/                       # Event system (Phase 1+)
+│   ├── mod.rs
+│   └── types.rs                  # ApertureEvent enum
+└── terminal/                     # Embedded terminal (portable-pty)
+    ├── mod.rs                    # Tauri commands, TerminalState
+    ├── session.rs                # PTY session management
+    └── error.rs                  # TerminalError types
 ```
 
 ---

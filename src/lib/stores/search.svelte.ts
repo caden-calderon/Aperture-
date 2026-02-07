@@ -107,7 +107,7 @@ function scheduleSearch(): void {
   if (debounceTimer) clearTimeout(debounceTimer);
   debounceTimer = setTimeout(() => {
     performSearch();
-  }, 150);
+  }, 250);
 }
 
 // ============================================================================

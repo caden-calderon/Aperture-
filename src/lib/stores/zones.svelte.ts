@@ -55,6 +55,33 @@ const BUILT_IN_ZONES: ZoneConfig[] = [
 ];
 
 // ============================================================================
+// Debounced persistence
+// ============================================================================
+
+let _dirty = false;
+let _saveTimer: ReturnType<typeof setTimeout> | undefined;
+
+function markDirty(): void {
+  _dirty = true;
+  if (_saveTimer) clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(() => {
+    saveToLocalStorage();
+    _dirty = false;
+  }, 1500);
+}
+
+function flushPendingWrites(): void {
+  if (_dirty) {
+    saveToLocalStorage();
+    _dirty = false;
+  }
+  if (_saveTimer) {
+    clearTimeout(_saveTimer);
+    _saveTimer = undefined;
+  }
+}
+
+// ============================================================================
 // State
 // ============================================================================
 
@@ -130,7 +157,7 @@ function addCustomZone(label: string, color: string): string {
     displayOrder: maxDisplayOrder + 1,
   };
   customZones = [...customZones, newZone];
-  saveToLocalStorage();
+  markDirty();
   return id;
 }
 
@@ -157,7 +184,7 @@ function updateZone(
       };
       builtInOverrides = { ...builtInOverrides };
     }
-    saveToLocalStorage();
+    markDirty();
     return;
   }
 
@@ -165,7 +192,7 @@ function updateZone(
   customZones = customZones.map((z) =>
     z.id === id ? { ...z, ...updates } : z
   );
-  saveToLocalStorage();
+  markDirty();
 }
 
 function deleteZone(id: string): void {
@@ -176,7 +203,7 @@ function deleteZone(id: string): void {
   customZones = customZones.filter((z) => z.id !== id);
   delete displayOrderOverrides[id];
   displayOrderOverrides = { ...displayOrderOverrides };
-  saveToLocalStorage();
+  markDirty();
 }
 
 function getZoneById(id: string): ZoneConfig | undefined {
@@ -194,7 +221,7 @@ function reorderZonesDisplay(zoneIds: string[]): void {
     displayOrderOverrides[id] = index;
   });
   displayOrderOverrides = { ...displayOrderOverrides };
-  saveToLocalStorage();
+  markDirty();
 }
 
 function resetBuiltInZone(id: string): void {
@@ -206,7 +233,7 @@ function resetBuiltInZone(id: string): void {
   builtInOverrides = { ...builtInOverrides };
   delete displayOrderOverrides[id];
   displayOrderOverrides = { ...displayOrderOverrides };
-  saveToLocalStorage();
+  markDirty();
 }
 
 function getOriginalBuiltIn(id: string): ZoneConfig | undefined {
@@ -221,13 +248,13 @@ function setZoneHeight(id: string, height: number): void {
   // No upper limit - let content determine max
   zoneHeights[id] = Math.max(MIN_ZONE_HEIGHT, height);
   zoneHeights = { ...zoneHeights };
-  saveToLocalStorage();
+  markDirty();
 }
 
 function resetZoneHeight(id: string): void {
   delete zoneHeights[id];
   zoneHeights = { ...zoneHeights };
-  saveToLocalStorage();
+  markDirty();
 }
 
 function isZoneExpanded(id: string): boolean {
@@ -236,12 +263,12 @@ function isZoneExpanded(id: string): boolean {
 
 function toggleZoneExpanded(id: string): void {
   expandedZones[id] = !expandedZones[id];
-  saveToLocalStorage();
+  markDirty();
 }
 
 function setZoneExpanded(id: string, expanded: boolean): void {
   expandedZones[id] = expanded;
-  saveToLocalStorage();
+  markDirty();
 }
 
 function isContentExpanded(id: string): boolean {
@@ -250,7 +277,7 @@ function isContentExpanded(id: string): boolean {
 
 function toggleContentExpanded(id: string): void {
   contentExpandedZones[id] = !contentExpandedZones[id];
-  saveToLocalStorage();
+  markDirty();
 }
 
 function setZoneContextOrder(id: string, contextOrder: number): void {
@@ -270,7 +297,7 @@ function setZoneContextOrder(id: string, contextOrder: number): void {
     // Actually middle is built-in, so we'd need different handling
     // For now, middle stays at 50
   }
-  saveToLocalStorage();
+  markDirty();
 }
 
 // ============================================================================
@@ -302,7 +329,7 @@ function recordTokenSnapshot(tokensByZone: Record<string, number>): void {
   // Only trigger reactivity if data actually changed
   if (changed) {
     tokenHistory = updated;
-    saveToLocalStorage();
+    markDirty();
   }
 }
 
@@ -318,13 +345,13 @@ import type { SnapshotZoneState } from "../types";
 
 function captureState(): SnapshotZoneState {
   return {
-    customZones: JSON.parse(JSON.stringify(customZones)),
-    displayOrderOverrides: { ...displayOrderOverrides },
-    builtInOverrides: JSON.parse(JSON.stringify(builtInOverrides)),
-    zoneHeights: { ...zoneHeights },
+    customZones: $state.snapshot(customZones),
+    displayOrderOverrides: $state.snapshot(displayOrderOverrides),
+    builtInOverrides: $state.snapshot(builtInOverrides),
+    zoneHeights: $state.snapshot(zoneHeights),
     expandedZones: Object.entries(expandedZones).filter(([, v]) => v).map(([k]) => k),
     contentExpandedZones: Object.entries(contentExpandedZones).filter(([, v]) => v).map(([k]) => k),
-    tokenHistory: JSON.parse(JSON.stringify(tokenHistory)),
+    tokenHistory: $state.snapshot(tokenHistory),
   };
 }
 
@@ -336,7 +363,7 @@ function restoreState(state: SnapshotZoneState): void {
   expandedZones = Object.fromEntries((state.expandedZones ?? []).map(id => [id, true]));
   contentExpandedZones = Object.fromEntries((state.contentExpandedZones ?? []).map(id => [id, true]));
   tokenHistory = state.tokenHistory ?? {};
-  saveToLocalStorage();
+  markDirty();
 }
 
 // ============================================================================
@@ -459,6 +486,7 @@ export const zonesStore = {
 
   // Actions
   init,
+  flushPendingWrites,
   addCustomZone,
   updateZone,
   deleteZone,

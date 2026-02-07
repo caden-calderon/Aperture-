@@ -39,6 +39,9 @@ let density = $state(1.0);
 // Minimap visibility
 let minimapVisible = $state(false);
 
+// Batch mode: disables transitions during rapid updates (e.g., streaming)
+let batchMode = $state(false);
+
 // ============================================================================
 // Derived State
 // ============================================================================
@@ -297,6 +300,18 @@ function initMinimap(): void {
 }
 
 // ============================================================================
+// Batch Mode Actions
+// ============================================================================
+
+function startBatch(): void {
+  batchMode = true;
+}
+
+function endBatch(): void {
+  batchMode = false;
+}
+
+// ============================================================================
 // Export Store Interface
 // ============================================================================
 
@@ -356,6 +371,12 @@ export const uiStore = {
   get minimapVisible() {
     return minimapVisible;
   },
+  get batchMode() {
+    return batchMode;
+  },
+  get transitionDuration() {
+    return batchMode ? 0 : 150;
+  },
 
   // Modal
   openModal,
@@ -404,4 +425,8 @@ export const uiStore = {
   // Minimap
   toggleMinimap,
   initMinimap,
+
+  // Batch mode
+  startBatch,
+  endBatch,
 };

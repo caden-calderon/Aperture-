@@ -5,6 +5,8 @@
 //! context without requiring any API keys of its own — the tools' existing
 //! credentials pass through transparently.
 
+pub mod engine;
+pub mod events;
 pub mod proxy;
 pub mod terminal;
 

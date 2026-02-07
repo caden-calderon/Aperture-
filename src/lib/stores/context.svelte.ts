@@ -33,6 +33,30 @@ let workingStateCache = $state<{ blocks: Block[]; zoneState: SnapshotZoneState }
 
 const STORAGE_KEY = "aperture-context";
 
+// Debounced persistence
+let _dirty = false;
+let _saveTimer: ReturnType<typeof setTimeout> | undefined;
+
+function markDirty(): void {
+  _dirty = true;
+  if (_saveTimer) clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(() => {
+    saveToLocalStorage();
+    _dirty = false;
+  }, 1500);
+}
+
+function flushPendingWrites(): void {
+  if (_dirty) {
+    saveToLocalStorage();
+    _dirty = false;
+  }
+  if (_saveTimer) {
+    clearTimeout(_saveTimer);
+    _saveTimer = undefined;
+  }
+}
+
 function saveToLocalStorage(): void {
   if (typeof localStorage === "undefined") return;
   try {
@@ -161,19 +185,19 @@ function moveBlock(blockId: string, targetZone: Zone): void {
 
   blocks[index] = { ...blocks[index], zone: targetZone };
   blocks = [...blocks];
-  saveToLocalStorage();
+  markDirty();
 }
 
 function moveBlocks(blockIds: string[], targetZone: Zone): void {
   const idSet = new Set(blockIds);
   blocks = blocks.map((b) => (idSet.has(b.id) ? { ...b, zone: targetZone } : b));
-  saveToLocalStorage();
+  markDirty();
 }
 
 function removeBlock(blockId: string): void {
   editHistoryStore.clearBlockHistory(blockId);
   blocks = blocks.filter((b) => b.id !== blockId);
-  saveToLocalStorage();
+  markDirty();
 }
 
 function removeBlocks(blockIds: string[]): void {
@@ -182,7 +206,7 @@ function removeBlocks(blockIds: string[]): void {
     editHistoryStore.clearBlockHistory(id);
   }
   blocks = blocks.filter((b) => !idSet.has(b.id));
-  saveToLocalStorage();
+  markDirty();
 }
 
 function createBlock(
@@ -214,7 +238,7 @@ function createBlock(
     metadata: { provider: "manual", turnIndex: blocks.length, filePaths: [] },
   };
   blocks = [...blocks, newBlock];
-  saveToLocalStorage();
+  markDirty();
   return newBlock;
 }
 
@@ -238,7 +262,7 @@ function updateBlockContent(blockId: string, content: string): void {
     },
   };
   blocks = [...blocks];
-  saveToLocalStorage();
+  markDirty();
 }
 
 function setBlockRole(blockId: string, role: Role, blockType?: string): void {
@@ -257,13 +281,13 @@ function setBlockRole(blockId: string, role: Role, blockType?: string): void {
 
   blocks[index] = { ...blocks[index], role, blockType };
   blocks = [...blocks];
-  saveToLocalStorage();
+  markDirty();
 }
 
 function setBlocksRole(blockIds: string[], role: Role): void {
   const idSet = new Set(blockIds);
   blocks = blocks.map((b) => (idSet.has(b.id) ? { ...b, role } : b));
-  saveToLocalStorage();
+  markDirty();
 }
 
 function reorderBlock(blockId: string, newIndex: number): void {
@@ -275,7 +299,7 @@ function reorderBlock(blockId: string, newIndex: number): void {
   newBlocks.splice(currentIndex, 1);
   newBlocks.splice(newIndex, 0, block);
   blocks = newBlocks;
-  saveToLocalStorage();
+  markDirty();
 }
 
 function reorderBlocksInZone(
@@ -306,7 +330,7 @@ function reorderBlocksInZone(
   stayingBlocks.splice(clampedIndex, 0, ...movingBlocks);
 
   blocks = [...otherBlocks, ...stayingBlocks];
-  saveToLocalStorage();
+  markDirty();
 }
 
 function setCompressionLevel(
@@ -327,7 +351,7 @@ function setCompressionLevel(
 
   blocks[index] = { ...blocks[index], compressionLevel: level };
   blocks = [...blocks];
-  saveToLocalStorage();
+  markDirty();
 }
 
 function pinBlock(blockId: string, position: Block["pinned"]): void {
@@ -345,7 +369,7 @@ function pinBlock(blockId: string, position: Block["pinned"]): void {
 
   blocks[index] = { ...blocks[index], pinned: position };
   blocks = [...blocks];
-  saveToLocalStorage();
+  markDirty();
 }
 
 function getValidDropRange(zone: Zone): { min: number; max: number } {
@@ -367,7 +391,7 @@ function updateBlockHeat(blockId: string, heat: number): void {
     usageHeat: Math.max(0, Math.min(1, heat)),
   };
   blocks = [...blocks];
-  saveToLocalStorage();
+  markDirty();
 }
 
 function saveSnapshot(name: string): Snapshot {
@@ -375,7 +399,7 @@ function saveSnapshot(name: string): Snapshot {
     id: `snap-${Date.now()}`,
     name,
     timestamp: new Date(),
-    blocks: JSON.parse(JSON.stringify(blocks)),
+    blocks: $state.snapshot(blocks),
     totalTokens: tokenBudget.used,
     type: "soft",
     zoneState: zonesStore.captureState(),
@@ -383,7 +407,7 @@ function saveSnapshot(name: string): Snapshot {
   };
 
   snapshots = [...snapshots, snapshot];
-  saveToLocalStorage();
+  markDirty();
   return snapshot;
 }
 
@@ -397,7 +421,7 @@ function deleteSnapshot(snapshotId: string): void {
     switchToWorkingState();
   }
   snapshots = snapshots.filter((s) => s.id !== snapshotId);
-  saveToLocalStorage();
+  markDirty();
 }
 
 function switchToSnapshot(snapshotId: string): boolean {
@@ -408,7 +432,7 @@ function switchToSnapshot(snapshotId: string): boolean {
   if (activeSnapshotId === null) {
     // Save working state to cache
     workingStateCache = {
-      blocks: JSON.parse(JSON.stringify(blocks)),
+      blocks: $state.snapshot(blocks),
       zoneState: zonesStore.captureState(),
     };
   } else {
@@ -417,7 +441,7 @@ function switchToSnapshot(snapshotId: string): boolean {
     if (activeIdx !== -1) {
       snapshots[activeIdx] = {
         ...snapshots[activeIdx],
-        blocks: JSON.parse(JSON.stringify(blocks)),
+        blocks: $state.snapshot(blocks),
         zoneState: zonesStore.captureState(),
         totalTokens: tokenBudget.used,
       };
@@ -426,12 +450,12 @@ function switchToSnapshot(snapshotId: string): boolean {
   }
 
   // Load target snapshot
-  blocks = JSON.parse(JSON.stringify(target.blocks));
+  blocks = $state.snapshot(target.blocks);
   if (target.zoneState) {
     zonesStore.restoreState(target.zoneState);
   }
   activeSnapshotId = snapshotId;
-  saveToLocalStorage();
+  markDirty();
   return true;
 }
 
@@ -443,7 +467,7 @@ function switchToWorkingState(): void {
   if (activeIdx !== -1) {
     snapshots[activeIdx] = {
       ...snapshots[activeIdx],
-      blocks: JSON.parse(JSON.stringify(blocks)),
+      blocks: $state.snapshot(blocks),
       zoneState: zonesStore.captureState(),
       totalTokens: tokenBudget.used,
     };
@@ -452,7 +476,7 @@ function switchToWorkingState(): void {
 
   // Restore working state from cache
   if (workingStateCache) {
-    blocks = JSON.parse(JSON.stringify(workingStateCache.blocks));
+    blocks = $state.snapshot(workingStateCache.blocks);
     if (workingStateCache.zoneState) {
       zonesStore.restoreState(workingStateCache.zoneState);
     }
@@ -460,7 +484,7 @@ function switchToWorkingState(): void {
   }
 
   activeSnapshotId = null;
-  saveToLocalStorage();
+  markDirty();
 }
 
 function renameSnapshot(snapshotId: string, name: string): void {
@@ -468,7 +492,7 @@ function renameSnapshot(snapshotId: string, name: string): void {
   if (idx === -1) return;
   snapshots[idx] = { ...snapshots[idx], name };
   snapshots = [...snapshots];
-  saveToLocalStorage();
+  markDirty();
 }
 
 // ============================================================================
@@ -501,6 +525,7 @@ export const contextStore = {
 
   // Actions
   init,
+  flushPendingWrites,
   loadDemoData,
   getBlock,
   getBlockIndex,

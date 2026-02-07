@@ -28,6 +28,7 @@
     onCreateBlock?: (zone: ZoneType, typeId: string) => void;
     onReorder?: (zone: ZoneType, blockIds: string[], insertIndex: number) => void;
     onResizeStart?: (e: MouseEvent, measuredHeight?: number) => void;
+    transitionDuration?: number;
   }
 
   let {
@@ -53,6 +54,7 @@
     onCreateBlock,
     onReorder,
     onResizeStart,
+    transitionDuration = 150,
   }: Props = $props();
 
   let isDragOver = $state(false);
@@ -325,7 +327,7 @@
             class:thread-first={threadPositions.get(block.id) === 'first'}
             class:thread-middle={threadPositions.get(block.id) === 'middle'}
             class:thread-last={threadPositions.get(block.id) === 'last'}
-            transition:slide={{ duration: 150 }}
+            transition:slide={{ duration: transitionDuration }}
           >
             <ContextBlock
               {block}

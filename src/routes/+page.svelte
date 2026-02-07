@@ -2,36 +2,41 @@
   import { onMount } from "svelte";
   import { TokenBudgetBar, Zone, Modal, Toast, CommandPalette, ThemeToggle, DensityControl, TitleBar, ThemeCustomizer, BlockTypeManager, ZoneManager, SearchBar, TerminalPanel, ContextMenu, ZoneMinimap, ContextDiff } from "$lib/components";
   import { contextStore, selectionStore, uiStore, themeStore, blockTypesStore, zonesStore, searchStore, terminalStore, editHistoryStore } from "$lib/stores";
+  import { createResizable, createBlockHandlers, createModalHandlers, createKeyboardHandlers, createCommandHandlers } from "$lib/composables";
   import type { Zone as ZoneType, Block } from "$lib/types";
 
-  // Sidebar resize state
-  let isResizingSidebar = $state(false);
-  let resizeStartX = $state(0);
-  let resizeStartWidth = $state(0);
-  let sidebarResizeRaf = $state<number | null>(null);
-  let sidebarRef = $state<HTMLElement | null>(null);
+  // -- Composables --
 
-  // Zone resize state
-  let resizingZoneId = $state<string | null>(null);
-  let zoneResizeStartY = $state(0);
-  let zoneResizeStartHeight = $state(0);
+  const resizable = createResizable({ uiStore, zonesStore, terminalStore });
+  const blockHandlers = createBlockHandlers({ selectionStore, uiStore, contextStore, zonesStore, blockTypesStore });
+  const modalHandlers = createModalHandlers({ uiStore, contextStore, blockTypesStore });
 
-  // Terminal split resize state
-  let isResizingTerminal = $state(false);
-  let termResizeStart = $state(0);
-  let termResizeStartSize = $state(0);
-  let termResizeRaf = $state<number | null>(null);
-  let terminalPanelRef = $state<HTMLElement | null>(null);
-  // Svelte 5 component instance type (replaces legacy $$ComponentRef)
+  // TerminalPanel component ref (shared between keyboard + command handlers)
   let terminalPanelComponentRef = $state<ReturnType<typeof TerminalPanel> | null>(null);
-  let contentRef = $state<HTMLElement | null>(null);
 
-  // Diff view state
+  const keyboardHandlers = createKeyboardHandlers(
+    { selectionStore, uiStore, contextStore, searchStore, terminalStore, zonesStore },
+    { get terminalPanelComponentRef() { return terminalPanelComponentRef; }, get terminalPanelRef() { return resizable.terminalPanelRef; } }
+  );
+
+  // Diff view state (stays in page -- used by template inline handlers)
   let diffViewOpen = $state(false);
   let diffFilterZone = $state<string | null>(null);
   let diffHighlightBlockId = $state<string | null>(null);
 
-  // Snapshot CRUD state
+  const commandHandlers = createCommandHandlers(
+    { uiStore, selectionStore, contextStore, searchStore, terminalStore, zonesStore },
+    { get terminalPanelComponentRef() { return terminalPanelComponentRef; } },
+    {
+      openDiffView: () => {
+        diffFilterZone = null;
+        diffHighlightBlockId = null;
+        diffViewOpen = true;
+      },
+    }
+  );
+
+  // Snapshot CRUD state (stays in page -- used by sidebar template)
   let editingSnapshotId = $state<string | null>(null);
   let editSnapshotName = $state("");
   let deleteConfirmId = $state<string | null>(null);
@@ -39,53 +44,27 @@
   // Zones container ref (for minimap scroll targeting)
   let zonesRef = $state<HTMLElement | null>(null);
 
-  // Context menu state
-  let contextMenuBlock = $state<string | null>(null);
-  let contextMenuX = $state(0);
-  let contextMenuY = $state(0);
-  let contextMenuVisible = $state(false);
-
-  // Minimum content area size before auto-collapsing context panel
-  const MIN_CONTENT_SIZE = 120;
-
   // Initialize stores on mount
   onMount(() => {
-    // Initialize theme store (loads from localStorage)
     themeStore.init();
-
-    // Initialize density from localStorage
     uiStore.initDensity();
-
-    // Initialize sidebar width
     uiStore.initSidebarWidth();
-
-    // Initialize custom block types
     blockTypesStore.init();
-
-    // Initialize zones store
     zonesStore.init();
-
-    // Initialize context panel state
     uiStore.initContextPanel();
-
-    // Initialize minimap
     uiStore.initMinimap();
-
-    // Initialize terminal store
     terminalStore.init();
-
-    // Initialize edit history
     editHistoryStore.init();
-
-    // Load persisted blocks or demo data
     contextStore.init();
 
-    // Cleanup terminal session on window close
+    // Flush debounced localStorage writes + cleanup terminal on window close
     const handleBeforeUnload = () => {
+      contextStore.flushPendingWrites();
+      zonesStore.flushPendingWrites();
+      editHistoryStore.flushPendingWrites();
+
       const sid = terminalStore.sessionId;
       if (sid) {
-        // Use navigator.sendBeacon-style sync cleanup isn't possible with Tauri IPC,
-        // but invoke is async. Fire-and-forget is the best we can do.
         import("@tauri-apps/api/core").then(({ invoke }) => {
           invoke('kill_session', { sessionId: sid }).catch(() => {});
         });
@@ -98,10 +77,7 @@
     };
   });
 
-  // Record token history for sparklines whenever blocks change.
-  // We pre-compute the tokensByZone map here to avoid reading derived
-  // state (like allZones) inside the store function, which would create
-  // unintended reactive dependencies and potential infinite loops.
+  // Record token history for sparklines whenever blocks change
   $effect(() => {
     const byZone = contextStore.blocksByZone;
     if (contextStore.blocks.length === 0) return;
@@ -115,637 +91,10 @@
 
   // Reactively update terminal theme when theme changes
   $effect(() => {
-    // Track theme changes
     void themeStore.currentPresetId;
     void themeStore.customColors;
-    // Update terminal if visible
     terminalPanelComponentRef?.updateTheme();
   });
-
-  // Sidebar resize handlers — uses rAF + direct DOM for smooth resize
-  function handleResizeStart(e: MouseEvent) {
-    isResizingSidebar = true;
-    resizeStartX = e.clientX;
-    resizeStartWidth = uiStore.sidebarWidth;
-    document.body.style.cursor = 'col-resize';
-    document.documentElement.classList.add('is-resizing');
-  }
-
-  function handleResizeMove(e: MouseEvent) {
-    if (!isResizingSidebar) return;
-    // Cancel any pending rAF to coalesce rapid mousemove events
-    if (sidebarResizeRaf) cancelAnimationFrame(sidebarResizeRaf);
-    sidebarResizeRaf = requestAnimationFrame(() => {
-      const delta = e.clientX - resizeStartX;
-      // Allow dragging all the way down for snap-to-collapse
-      const newWidth = Math.max(uiStore.collapsedSidebarWidth, Math.min(400, resizeStartWidth + delta));
-      // Direct DOM update during drag for smoothness — bypasses Svelte reactivity
-      if (sidebarRef) {
-        sidebarRef.style.width = `${newWidth}px`;
-      }
-    });
-  }
-
-  function handleResizeEnd() {
-    if (!isResizingSidebar) return;
-    if (sidebarResizeRaf) cancelAnimationFrame(sidebarResizeRaf);
-    // Commit final width to store (triggers one reactive update — handles snap-to-collapse)
-    if (sidebarRef) {
-      const finalWidth = parseInt(sidebarRef.style.width) || uiStore.sidebarWidth;
-      uiStore.setSidebarWidth(finalWidth);
-      // Sync DOM with store-determined width
-      sidebarRef.style.width = `${uiStore.sidebarWidth}px`;
-    }
-    isResizingSidebar = false;
-    document.body.style.cursor = '';
-    document.documentElement.classList.remove('is-resizing');
-  }
-
-  // Zone resize handlers
-  function handleZoneResizeStart(e: MouseEvent, zoneId: string, measuredHeight?: number) {
-    e.preventDefault();
-    e.stopPropagation();
-
-    // If zone is expanded, capture its actual rendered height before un-expanding
-    if (zonesStore.isZoneExpanded(zoneId)) {
-      if (measuredHeight && measuredHeight > zonesStore.minZoneHeight) {
-        zonesStore.setZoneHeight(zoneId, measuredHeight);
-      }
-      zonesStore.setZoneExpanded(zoneId, false);
-    }
-
-    resizingZoneId = zoneId;
-    zoneResizeStartY = e.clientY;
-
-    const storedHeight = zonesStore.getZoneHeight(zoneId);
-    // Snap to actual content height if it's less than stored max-height.
-    // This prevents a "dead zone" where dragging increases max-height
-    // but nothing visual changes because content doesn't fill the zone.
-    if (measuredHeight && measuredHeight < storedHeight) {
-      zonesStore.setZoneHeight(zoneId, Math.max(measuredHeight, zonesStore.minZoneHeight));
-      zoneResizeStartHeight = Math.max(measuredHeight, zonesStore.minZoneHeight);
-    } else {
-      zoneResizeStartHeight = storedHeight;
-    }
-
-    document.body.style.cursor = 'row-resize';
-    document.body.style.userSelect = 'none';
-    window.getSelection()?.removeAllRanges();
-  }
-
-  function handleZoneResizeMove(e: MouseEvent) {
-    if (!resizingZoneId) return;
-    e.preventDefault();
-    const delta = e.clientY - zoneResizeStartY;
-    zonesStore.setZoneHeight(resizingZoneId, zoneResizeStartHeight + delta);
-  }
-
-  function handleZoneResizeEnd() {
-    if (!resizingZoneId) return;
-    resizingZoneId = null;
-    document.body.style.cursor = '';
-    document.body.style.userSelect = '';
-  }
-
-  // Terminal split resize handlers — rAF + direct DOM
-  function handleTermResizeStart(e: MouseEvent) {
-    e.preventDefault();
-    isResizingTerminal = true;
-    const isBottom = terminalStore.position === 'bottom';
-    termResizeStart = isBottom ? e.clientY : e.clientX;
-
-    // When context is collapsed, terminal fills via flex — measure actual DOM size
-    if (uiStore.contextPanelCollapsed && terminalPanelRef) {
-      termResizeStartSize = isBottom
-        ? terminalPanelRef.clientHeight
-        : terminalPanelRef.clientWidth;
-      // Switch from flex fill to fixed size for smooth drag
-      if (isBottom) {
-        terminalPanelRef.style.height = `${termResizeStartSize}px`;
-      } else {
-        terminalPanelRef.style.width = `${termResizeStartSize}px`;
-      }
-      terminalPanelRef.style.flex = '0 0 auto';
-    } else {
-      termResizeStartSize = isBottom ? terminalStore.terminalHeight : terminalStore.terminalWidth;
-    }
-
-    document.body.style.cursor = isBottom ? 'row-resize' : 'col-resize';
-    document.body.style.userSelect = 'none';
-    document.documentElement.classList.add('is-resizing');
-  }
-
-  function handleTermResizeMove(e: MouseEvent) {
-    if (!isResizingTerminal) return;
-    if (termResizeRaf) cancelAnimationFrame(termResizeRaf);
-    termResizeRaf = requestAnimationFrame(() => {
-      const isBottom = terminalStore.position === 'bottom';
-      // Invert delta: dragging up/left should increase size
-      const delta = isBottom
-        ? termResizeStart - e.clientY
-        : termResizeStart - e.clientX;
-      const newSize = Math.max(terminalStore.collapsedSize, termResizeStartSize + delta);
-      if (terminalPanelRef) {
-        if (isBottom) {
-          terminalPanelRef.style.height = `${newSize}px`;
-        } else {
-          terminalPanelRef.style.width = `${newSize}px`;
-        }
-      }
-    });
-  }
-
-  function handleTermResizeEnd() {
-    if (!isResizingTerminal) return;
-    if (termResizeRaf) cancelAnimationFrame(termResizeRaf);
-
-    const wasContextCollapsed = uiStore.contextPanelCollapsed;
-
-    if (terminalPanelRef) {
-      const isBottom = terminalStore.position === 'bottom';
-
-      // Reset flex override from collapsed-context drag
-      terminalPanelRef.style.flex = '';
-
-      if (isBottom) {
-        const finalHeight = parseInt(terminalPanelRef.style.height) || terminalStore.terminalHeight;
-        terminalStore.setHeight(finalHeight);
-        terminalPanelRef.style.height = `${terminalStore.terminalHeight}px`;
-      } else {
-        const finalWidth = parseInt(terminalPanelRef.style.width) || terminalStore.terminalWidth;
-        terminalStore.setWidth(finalWidth);
-        terminalPanelRef.style.width = `${terminalStore.terminalWidth}px`;
-      }
-    }
-
-    if (wasContextCollapsed) {
-      // Un-collapse context if terminal was dragged smaller, freeing enough space
-      const isBottom = terminalStore.position === 'bottom';
-      const freedSpace = termResizeStartSize - (isBottom ? terminalStore.terminalHeight : terminalStore.terminalWidth);
-      if (freedSpace >= MIN_CONTENT_SIZE) {
-        uiStore.toggleContextPanel();
-      }
-    } else if (contentRef) {
-      // Auto-collapse context if content area is too small
-      const isBottom = terminalStore.position === 'bottom';
-      const containerSize = isBottom ? contentRef.clientHeight : contentRef.clientWidth;
-      const termSize = isBottom ? terminalStore.terminalHeight : terminalStore.terminalWidth;
-      const handleSize = 4;
-      const remaining = containerSize - termSize - handleSize;
-      if (remaining < MIN_CONTENT_SIZE) {
-        uiStore.toggleContextPanel();
-      }
-    }
-
-    isResizingTerminal = false;
-    document.body.style.cursor = '';
-    document.body.style.userSelect = '';
-    document.documentElement.classList.remove('is-resizing');
-  }
-
-  // Flat ordered list of all visible blocks (zone display order)
-  const allBlocksFlat = $derived(
-    zonesStore.zonesByDisplayOrder.flatMap(z => contextStore.blocksByZone[z.id] ?? [])
-  );
-
-  // Navigate blocks with keyboard (J/K/Arrow)
-  function navigateBlock(direction: 'up' | 'down'): void {
-    const flat = allBlocksFlat;
-    if (flat.length === 0) return;
-
-    const currentFocused = selectionStore.focusedId;
-    const currentIdx = currentFocused ? flat.findIndex(b => b.id === currentFocused) : -1;
-
-    let nextIdx: number;
-    if (currentIdx === -1) {
-      // No current focus — start from first or last
-      nextIdx = direction === 'down' ? 0 : flat.length - 1;
-    } else {
-      nextIdx = direction === 'down' ? currentIdx + 1 : currentIdx - 1;
-    }
-
-    // Clamp to bounds
-    if (nextIdx < 0 || nextIdx >= flat.length) return;
-    selectionStore.focus(flat[nextIdx].id);
-  }
-
-  // Keyboard shortcuts
-  function handleKeydown(e: KeyboardEvent) {
-    // Ctrl+T toggles terminal, even from inputs
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "t") {
-      e.preventDefault();
-      // If terminal is visible and focused, hide it. If visible but not focused, focus it.
-      // If hidden, show and focus it.
-      if (terminalStore.isVisible) {
-        const termEl = terminalPanelRef?.querySelector('.xterm-helper-textarea');
-        if (termEl && document.activeElement === termEl) {
-          terminalStore.hide();
-        } else {
-          requestAnimationFrame(() => terminalPanelComponentRef?.focusTerminal());
-        }
-      } else {
-        terminalStore.show();
-        requestAnimationFrame(() => terminalPanelComponentRef?.focusTerminal());
-      }
-      return;
-    }
-
-    // Ctrl+F always opens search, even from inputs
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "f") {
-      e.preventDefault();
-      searchStore.toggle();
-      return;
-    }
-
-    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
-      return;
-    }
-
-    if (uiStore.hasModal || uiStore.commandPaletteOpen) {
-      return;
-    }
-
-    // F3 / Shift+F3 for search navigation (when search is open)
-    if (e.key === "F3" && searchStore.isOpen) {
-      e.preventDefault();
-      if (e.shiftKey) searchStore.previousMatch();
-      else searchStore.nextMatch();
-      return;
-    }
-
-    switch (e.key.toLowerCase()) {
-      case "a":
-        if (!e.ctrlKey && !e.metaKey) {
-          e.preventDefault();
-          selectionStore.selectAll();
-          uiStore.showToast("Selected all blocks", "info");
-        }
-        break;
-      case "escape":
-        e.preventDefault();
-        if (searchStore.isOpen) {
-          searchStore.close();
-        } else {
-          selectionStore.deselect();
-        }
-        break;
-      case "delete":
-      case "backspace":
-        if (selectionStore.hasSelection) {
-          e.preventDefault();
-          const count = selectionStore.count;
-          contextStore.removeBlocks([...selectionStore.selectedIds]);
-          selectionStore.deselect();
-          uiStore.showToast(`Removed ${count} block(s)`, "success");
-        }
-        break;
-      case "s":
-        if (!e.ctrlKey && !e.metaKey) {
-          e.preventDefault();
-          const snap = contextStore.saveSnapshot(`Snapshot ${contextStore.snapshots.length + 1}`);
-          uiStore.showToast(`Saved: ${snap.name}`, "success");
-        }
-        break;
-      case "k":
-        if (e.ctrlKey || e.metaKey) {
-          e.preventDefault();
-          uiStore.toggleCommandPalette();
-        } else {
-          e.preventDefault();
-          navigateBlock('up');
-        }
-        break;
-      case "[":
-        if (e.ctrlKey || e.metaKey) {
-          e.preventDefault();
-          uiStore.toggleSidebar();
-        }
-        break;
-      case "j":
-        if (!e.ctrlKey && !e.metaKey) {
-          e.preventDefault();
-          navigateBlock('down');
-        }
-        break;
-      case "arrowdown":
-        e.preventDefault();
-        navigateBlock('down');
-        break;
-      case "arrowup":
-        e.preventDefault();
-        navigateBlock('up');
-        break;
-      case "enter":
-        if (selectionStore.focusedId) {
-          e.preventDefault();
-          uiStore.openModal(selectionStore.focusedId);
-        }
-        break;
-    }
-  }
-
-  // Event handlers
-  function handleBlockSelect(id: string, event: { shiftKey: boolean; ctrlKey: boolean; metaKey: boolean }) {
-    selectionStore.handleClick(id, event);
-  }
-
-  function handleBlockDoubleClick(id: string) {
-    uiStore.openModal(id);
-  }
-
-  function handleBlockDragStart(ids: string[]) {
-    uiStore.startDrag(ids);
-  }
-
-  function handleBlockDragEnd() {
-    uiStore.endDrag();
-  }
-
-  function handleBlockContextMenu(id: string, e: MouseEvent) {
-    e.preventDefault();
-    contextMenuBlock = id;
-    contextMenuX = e.clientX;
-    contextMenuY = e.clientY;
-    contextMenuVisible = true;
-    // Select the block if not already selected
-    if (!selectionStore.selectedIds.has(id)) {
-      selectionStore.select(id);
-    }
-  }
-
-  function closeContextMenu() {
-    contextMenuVisible = false;
-    contextMenuBlock = null;
-  }
-
-  function handleZoneDrop(zone: ZoneType, blockIds: string[]) {
-    for (const id of blockIds) {
-      contextStore.moveBlock(id, zone);
-    }
-    const count = blockIds.length;
-    const zoneName = zonesStore.getZoneById(zone)?.label ?? zone;
-    uiStore.showToast(`Moved ${count > 1 ? `${count} blocks` : '1 block'} to ${zoneName}`, "info");
-  }
-
-  function handleZoneReorder(zone: ZoneType, blockIds: string[], insertIndex: number) {
-    contextStore.reorderBlocksInZone(zone, blockIds, insertIndex);
-    const count = blockIds.length;
-    uiStore.showToast(`Reordered ${count > 1 ? `${count} blocks` : 'block'}`, "info");
-  }
-
-  function handleCreateBlock(zone: ZoneType, typeId: string) {
-    // Create a new block with the specified type
-    const blockTypeInfo = blockTypesStore.getTypeById(typeId);
-    const label = blockTypeInfo?.label ?? typeId;
-
-    // Determine role: built-in types use their ID as role, custom types default to "user"
-    const isBuiltIn = blockTypeInfo?.isBuiltIn ?? false;
-    const role: Block["role"] = isBuiltIn ? (typeId as Block["role"]) : "user";
-    const content = `New ${label} block`;
-
-    // Pass blockType for custom types so display knows which type this is
-    const newBlock = contextStore.createBlock(zone, role, content, isBuiltIn ? undefined : typeId);
-    selectionStore.select(newBlock.id);
-    uiStore.openModal(newBlock.id);
-    const zoneName = zonesStore.getZoneById(zone)?.label ?? zone;
-    uiStore.showToast(`Created ${label} block in ${zoneName}`, "success");
-  }
-
-  function handleToggleZoneCollapse(zone: ZoneType) {
-    uiStore.toggleZoneCollapse(zone);
-  }
-
-  // Modal handlers
-  function handleModalClose() {
-    uiStore.closeModal();
-  }
-
-  function handleModalCompress(level: Block["compressionLevel"]) {
-    if (uiStore.modalBlockId) {
-      contextStore.setCompressionLevel(uiStore.modalBlockId, level);
-    }
-  }
-
-  function handleModalMove(zone: ZoneType) {
-    if (uiStore.modalBlockId) {
-      contextStore.moveBlock(uiStore.modalBlockId, zone);
-    }
-  }
-
-  function handleModalPin(position: Block["pinned"]) {
-    if (uiStore.modalBlockId) {
-      contextStore.pinBlock(uiStore.modalBlockId, position);
-    }
-  }
-
-  function handleModalRemove() {
-    if (uiStore.modalBlockId) {
-      contextStore.removeBlock(uiStore.modalBlockId);
-      uiStore.closeModal();
-      uiStore.showToast("Block removed", "success");
-    }
-  }
-
-  function handleModalContentEdit(content: string) {
-    if (uiStore.modalBlockId) {
-      contextStore.updateBlockContent(uiStore.modalBlockId, content);
-      uiStore.showToast("Content updated", "success");
-    }
-  }
-
-  function handleModalRoleChange(role: Block["role"], blockType?: string) {
-    if (uiStore.modalBlockId) {
-      contextStore.setBlockRole(uiStore.modalBlockId, role, blockType);
-      const label = blockType
-        ? blockTypesStore.getTypeById(blockType)?.label ?? blockType
-        : role;
-      uiStore.showToast(`Changed type to ${label}`, "success");
-    }
-  }
-
-  // Command palette handler
-  function handleCommand(command: string) {
-    switch (command) {
-      // View
-      case 'toggle-sidebar':
-        uiStore.toggleSidebar();
-        break;
-      case 'toggle-context-panel':
-        uiStore.toggleContextPanel();
-        break;
-      case 'toggle-minimap':
-        uiStore.toggleMinimap();
-        uiStore.showToast(uiStore.minimapVisible ? 'Minimap shown' : 'Minimap hidden', 'info');
-        break;
-      case 'expand-all-zones': {
-        uiStore.expandAllZones();
-        // Also expand all zone heights
-        for (const z of zonesStore.zonesByDisplayOrder) {
-          zonesStore.setZoneExpanded(z.id, true);
-        }
-        uiStore.showToast('All zones expanded', 'info');
-        break;
-      }
-      case 'collapse-all-zones':
-        uiStore.collapseAllZonesFrom(zonesStore.zonesByDisplayOrder.map(z => z.id));
-        uiStore.showToast('All zones collapsed', 'info');
-        break;
-      case 'toggle-primacy':
-        uiStore.toggleZoneCollapse('primacy');
-        break;
-      case 'toggle-middle':
-        uiStore.toggleZoneCollapse('middle');
-        break;
-      case 'toggle-recency':
-        uiStore.toggleZoneCollapse('recency');
-        break;
-
-      // Search
-      case 'search':
-        searchStore.open();
-        break;
-      case 'search-next':
-        searchStore.nextMatch();
-        break;
-      case 'search-prev':
-        searchStore.previousMatch();
-        break;
-      case 'search-select-all': {
-        const matchedIds = searchStore.selectAllResults();
-        if (matchedIds.length > 0) {
-          selectionStore.deselect();
-          for (const id of matchedIds) {
-            selectionStore.handleClick(id, { shiftKey: false, ctrlKey: true, metaKey: false });
-          }
-          uiStore.showToast(`Selected ${matchedIds.length} matching block(s)`, 'info');
-        }
-        break;
-      }
-
-      // Selection
-      case 'select-all':
-        selectionStore.selectAll();
-        uiStore.showToast('Selected all blocks', 'info');
-        break;
-      case 'deselect':
-        selectionStore.deselect();
-        break;
-
-      // Edit
-      case 'remove-selected':
-        if (selectionStore.hasSelection) {
-          const count = selectionStore.count;
-          contextStore.removeBlocks([...selectionStore.selectedIds]);
-          selectionStore.deselect();
-          uiStore.showToast(`Removed ${count} block(s)`, 'success');
-        }
-        break;
-      case 'pin-selected-top':
-        if (selectionStore.hasSelection) {
-          for (const id of selectionStore.selectedIds) {
-            contextStore.pinBlock(id, 'top');
-          }
-          uiStore.showToast(`Pinned ${selectionStore.count} block(s) to top`, 'success');
-        }
-        break;
-      case 'pin-selected-bottom':
-        if (selectionStore.hasSelection) {
-          for (const id of selectionStore.selectedIds) {
-            contextStore.pinBlock(id, 'bottom');
-          }
-          uiStore.showToast(`Pinned ${selectionStore.count} block(s) to bottom`, 'success');
-        }
-        break;
-      case 'unpin-selected':
-        if (selectionStore.hasSelection) {
-          for (const id of selectionStore.selectedIds) {
-            contextStore.pinBlock(id, null);
-          }
-          uiStore.showToast(`Unpinned ${selectionStore.count} block(s)`, 'success');
-        }
-        break;
-      case 'compress-selected-trimmed':
-        if (selectionStore.hasSelection) {
-          for (const id of selectionStore.selectedIds) {
-            contextStore.setCompressionLevel(id, 'trimmed');
-          }
-          uiStore.showToast(`Compressed ${selectionStore.count} block(s) to trimmed`, 'success');
-        }
-        break;
-      case 'compress-selected-summarized':
-        if (selectionStore.hasSelection) {
-          for (const id of selectionStore.selectedIds) {
-            contextStore.setCompressionLevel(id, 'summarized');
-          }
-          uiStore.showToast(`Compressed ${selectionStore.count} block(s) to summarized`, 'success');
-        }
-        break;
-      case 'move-selected-primacy':
-        if (selectionStore.hasSelection) {
-          for (const id of selectionStore.selectedIds) {
-            contextStore.moveBlock(id, 'primacy');
-          }
-          uiStore.showToast(`Moved ${selectionStore.count} block(s) to Primacy`, 'success');
-        }
-        break;
-      case 'move-selected-middle':
-        if (selectionStore.hasSelection) {
-          for (const id of selectionStore.selectedIds) {
-            contextStore.moveBlock(id, 'middle');
-          }
-          uiStore.showToast(`Moved ${selectionStore.count} block(s) to Middle`, 'success');
-        }
-        break;
-      case 'move-selected-recency':
-        if (selectionStore.hasSelection) {
-          for (const id of selectionStore.selectedIds) {
-            contextStore.moveBlock(id, 'recency');
-          }
-          uiStore.showToast(`Moved ${selectionStore.count} block(s) to Recency`, 'success');
-        }
-        break;
-
-      // Terminal
-      case 'toggle-terminal':
-        terminalStore.toggle();
-        if (terminalStore.isVisible) {
-          requestAnimationFrame(() => terminalPanelComponentRef?.focusTerminal());
-        }
-        break;
-      case 'terminal-position-bottom':
-        terminalStore.setPosition('bottom');
-        if (!terminalStore.isVisible) terminalStore.show();
-        break;
-      case 'terminal-position-right':
-        terminalStore.setPosition('right');
-        if (!terminalStore.isVisible) terminalStore.show();
-        break;
-      case 'terminal-clear':
-        terminalPanelComponentRef?.clearTerminal();
-        break;
-
-      // Data
-      case 'snapshot': {
-        const snap = contextStore.saveSnapshot(`Snapshot ${contextStore.snapshots.length + 1}`);
-        uiStore.showToast(`Saved: ${snap.name}`, 'success');
-        break;
-      }
-      case 'diff-view':
-        diffFilterZone = null;
-        diffHighlightBlockId = null;
-        diffViewOpen = true;
-        break;
-      case 'load-demo':
-        contextStore.loadDemoData();
-        uiStore.showToast('Demo data loaded', 'success');
-        break;
-      case 'clear-all-blocks':
-        contextStore.removeBlocks(contextStore.blocks.map(b => b.id));
-        selectionStore.deselect();
-        uiStore.showToast('All blocks cleared', 'success');
-        break;
-    }
-  }
 
   function formatNumber(n: number): string {
     return n.toLocaleString();
@@ -753,9 +102,9 @@
 </script>
 
 <svelte:window
-  on:keydown={handleKeydown}
-  on:mousemove={(e) => { handleResizeMove(e); handleZoneResizeMove(e); handleTermResizeMove(e); }}
-  on:mouseup={() => { handleResizeEnd(); handleZoneResizeEnd(); handleTermResizeEnd(); }}
+  on:keydown={keyboardHandlers.handleKeydown}
+  on:mousemove={(e) => { resizable.handleResizeMove(e); resizable.handleZoneResizeMove(e); resizable.handleTermResizeMove(e); }}
+  on:mouseup={() => { resizable.handleResizeEnd(); resizable.handleZoneResizeEnd(); resizable.handleTermResizeEnd(); }}
 />
 
 <div class="app">
@@ -783,8 +132,8 @@
     <aside
       class="sidebar"
       class:sidebar-collapsed={uiStore.sidebarCollapsed}
-      class:sidebar-animating={!isResizingSidebar}
-      bind:this={sidebarRef}
+      class:sidebar-animating={!resizable.isResizingSidebar}
+      bind:this={resizable.sidebarRef}
       style:width="{uiStore.sidebarWidth}px"
     >
       {#if uiStore.sidebarCollapsed}
@@ -948,8 +297,8 @@
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
       class="sidebar-resize-handle"
-      class:active={isResizingSidebar}
-      onmousedown={handleResizeStart}
+      class:active={resizable.isResizingSidebar}
+      onmousedown={resizable.handleResizeStart}
     >
       <button
         class="sidebar-toggle-btn"
@@ -960,7 +309,7 @@
     </div>
 
     <!-- Content -->
-    <div class="content" class:content-right={terminalStore.isVisible && terminalStore.position === 'right'} bind:this={contentRef}>
+    <div class="content" class:content-right={terminalStore.isVisible && terminalStore.position === 'right'} bind:this={resizable.contentRef}>
       {#if uiStore.contextPanelCollapsed}
         <!-- Context panel collapsed bar -->
         <button class="context-collapsed" onclick={() => uiStore.toggleContextPanel()} title="Expand context panel">
@@ -983,7 +332,7 @@
               {#if uiStore.minimapVisible && contextStore.blocks.length > 0}
                 <ZoneMinimap
                   zonesContainer={zonesRef}
-                  onDrop={handleZoneDrop}
+                  onDrop={blockHandlers.handleZoneDrop}
                 />
               {:else if contextStore.blocks.length > 0}
                 <button
@@ -1028,7 +377,7 @@
           <SearchBar />
 
           <!-- Zones -->
-          <div class="zones" class:resizing={resizingZoneId !== null} bind:this={zonesRef}>
+          <div class="zones" class:resizing={resizable.resizingZoneId !== null} bind:this={zonesRef}>
             {#if contextStore.blocks.length === 0}
               <div class="empty-state">
                 <div class="empty-icon">
@@ -1076,19 +425,20 @@
                   height={zonesStore.getZoneHeight(zoneConfig.id)}
                   expanded={zonesStore.isZoneExpanded(zoneConfig.id)}
                   contentExpanded={zonesStore.isContentExpanded(zoneConfig.id)}
-                  isResizing={resizingZoneId === zoneConfig.id}
-                  onToggleCollapse={() => handleToggleZoneCollapse(zoneConfig.id as ZoneType)}
-                  onToggleExpanded={() => { if (!resizingZoneId) zonesStore.toggleZoneExpanded(zoneConfig.id); }}
+                  isResizing={resizable.resizingZoneId === zoneConfig.id}
+                  onToggleCollapse={() => blockHandlers.handleToggleZoneCollapse(zoneConfig.id as ZoneType)}
+                  onToggleExpanded={() => { if (!resizable.resizingZoneId) zonesStore.toggleZoneExpanded(zoneConfig.id); }}
                   onToggleContentExpanded={() => zonesStore.toggleContentExpanded(zoneConfig.id)}
-                  onBlockSelect={handleBlockSelect}
-                  onBlockDoubleClick={handleBlockDoubleClick}
-                  onBlockContextMenu={handleBlockContextMenu}
-                  onBlockDragStart={handleBlockDragStart}
-                  onBlockDragEnd={handleBlockDragEnd}
-                  onDrop={handleZoneDrop}
-                  onCreateBlock={handleCreateBlock}
-                  onReorder={handleZoneReorder}
-                  onResizeStart={(e, h) => handleZoneResizeStart(e, zoneConfig.id, h)}
+                  onBlockSelect={blockHandlers.handleBlockSelect}
+                  onBlockDoubleClick={blockHandlers.handleBlockDoubleClick}
+                  onBlockContextMenu={blockHandlers.handleBlockContextMenu}
+                  onBlockDragStart={blockHandlers.handleBlockDragStart}
+                  onBlockDragEnd={blockHandlers.handleBlockDragEnd}
+                  onDrop={blockHandlers.handleZoneDrop}
+                  onCreateBlock={blockHandlers.handleCreateBlock}
+                  onReorder={blockHandlers.handleZoneReorder}
+                  onResizeStart={(e, h) => resizable.handleZoneResizeStart(e, zoneConfig.id, h)}
+                  transitionDuration={uiStore.transitionDuration}
                 />
               {/each}
             {/if}
@@ -1103,8 +453,8 @@
         <div
           class="terminal-split-handle"
           class:terminal-split-vertical={terminalStore.position === 'right'}
-          class:active={isResizingTerminal}
-          onmousedown={handleTermResizeStart}
+          class:active={resizable.isResizingTerminal}
+          onmousedown={resizable.handleTermResizeStart}
         >
           <button
             class="terminal-toggle-btn"
@@ -1125,7 +475,7 @@
           class="terminal-panel-wrapper"
           class:terminal-panel-right={terminalStore.position === 'right'}
           class:terminal-fill={uiStore.contextPanelCollapsed}
-          bind:this={terminalPanelRef}
+          bind:this={resizable.terminalPanelRef}
           style={uiStore.contextPanelCollapsed
             ? ''
             : (terminalStore.position === 'bottom'
@@ -1143,13 +493,13 @@
 <Modal
   block={uiStore.modalBlockId ? contextStore.getBlock(uiStore.modalBlockId) ?? null : null}
   open={uiStore.hasModal}
-  onClose={handleModalClose}
-  onCompress={handleModalCompress}
-  onMove={handleModalMove}
-  onPin={handleModalPin}
-  onRemove={handleModalRemove}
-  onRoleChange={handleModalRoleChange}
-  onContentEdit={handleModalContentEdit}
+  onClose={modalHandlers.handleModalClose}
+  onCompress={modalHandlers.handleModalCompress}
+  onMove={modalHandlers.handleModalMove}
+  onPin={modalHandlers.handleModalPin}
+  onRemove={modalHandlers.handleModalRemove}
+  onRoleChange={modalHandlers.handleModalRoleChange}
+  onContentEdit={modalHandlers.handleModalContentEdit}
   onOpenDiff={(filterZone, highlightBlockId) => {
     diffFilterZone = filterZone ?? null;
     diffHighlightBlockId = highlightBlockId ?? null;
@@ -1170,7 +520,7 @@
 <CommandPalette
   open={uiStore.commandPaletteOpen}
   onClose={() => uiStore.toggleCommandPalette()}
-  onCommand={handleCommand}
+  onCommand={commandHandlers.handleCommand}
 />
 
 <!-- Context Diff View -->
@@ -1188,34 +538,34 @@
 
 <!-- Context Menu (right-click) -->
 <ContextMenu
-  block={contextMenuBlock ? contextStore.getBlock(contextMenuBlock) ?? null : null}
-  x={contextMenuX}
-  y={contextMenuY}
-  visible={contextMenuVisible}
-  onClose={closeContextMenu}
+  block={blockHandlers.contextMenuBlock ? contextStore.getBlock(blockHandlers.contextMenuBlock) ?? null : null}
+  x={blockHandlers.contextMenuX}
+  y={blockHandlers.contextMenuY}
+  visible={blockHandlers.contextMenuVisible}
+  onClose={blockHandlers.closeContextMenu}
   onPin={(pos: "top" | "bottom" | null) => {
-    if (contextMenuBlock) {
-      contextStore.pinBlock(contextMenuBlock, pos);
+    if (blockHandlers.contextMenuBlock) {
+      contextStore.pinBlock(blockHandlers.contextMenuBlock, pos);
       const label = pos ? `Pinned to ${pos}` : 'Unpinned';
       uiStore.showToast(label, 'success');
     }
   }}
   onMove={(zone: ZoneType) => {
-    if (contextMenuBlock) {
-      contextStore.moveBlock(contextMenuBlock, zone);
+    if (blockHandlers.contextMenuBlock) {
+      contextStore.moveBlock(blockHandlers.contextMenuBlock, zone);
       const zoneName = zonesStore.getZoneById(zone)?.label ?? zone;
       uiStore.showToast(`Moved to ${zoneName}`, 'info');
     }
   }}
   onCompress={(level: Block["compressionLevel"]) => {
-    if (contextMenuBlock) {
-      contextStore.setCompressionLevel(contextMenuBlock, level);
+    if (blockHandlers.contextMenuBlock) {
+      contextStore.setCompressionLevel(blockHandlers.contextMenuBlock, level);
       uiStore.showToast(`Set to ${level}`, 'success');
     }
   }}
   onCopy={() => {
-    if (contextMenuBlock) {
-      const block = contextStore.getBlock(contextMenuBlock);
+    if (blockHandlers.contextMenuBlock) {
+      const block = contextStore.getBlock(blockHandlers.contextMenuBlock);
       if (block) {
         navigator.clipboard.writeText(block.content);
         uiStore.showToast('Copied to clipboard', 'success');
@@ -1223,14 +573,14 @@
     }
   }}
   onRemove={() => {
-    if (contextMenuBlock) {
-      contextStore.removeBlock(contextMenuBlock);
+    if (blockHandlers.contextMenuBlock) {
+      contextStore.removeBlock(blockHandlers.contextMenuBlock);
       uiStore.showToast('Block removed', 'success');
     }
   }}
   onOpen={() => {
-    if (contextMenuBlock) {
-      uiStore.openModal(contextMenuBlock);
+    if (blockHandlers.contextMenuBlock) {
+      uiStore.openModal(blockHandlers.contextMenuBlock);
     }
   }}
 />

@@ -24,4 +24,16 @@ pub enum ProxyError {
     /// Failed to parse URL.
     #[error("invalid URL: {0}")]
     InvalidUrl(String),
+
+    /// Request body exceeds size limit.
+    #[error("request too large: {size} bytes exceeds {limit} byte limit")]
+    RequestTooLarge { size: usize, limit: usize },
+
+    /// Upstream server did not respond in time.
+    #[error("upstream request timed out")]
+    UpstreamTimeout,
+
+    /// Failed to parse request or response body.
+    #[error("parsing failed: {0}")]
+    ParsingFailed(String),
 }

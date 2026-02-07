@@ -35,7 +35,8 @@
 
 | Phase | Name | Status | Focus |
 |-------|------|--------|-------|
-| 0 | UI Foundation | 🔄 IN PROGRESS | Tauri + Svelte 5 shell, full visual UI with mock data, theme customizer |
+| 0 | UI Foundation | COMPLETE | Tauri + Svelte 5 shell, full visual UI with mock data, theme customizer |
+| 0.5 | Foundation Hardening | COMPLETE | Composable extraction, performance, backend scaffolding |
 | 1 | Proxy Core | PENDING | HTTP intercept, request/response capture, WebSocket events |
 | 2 | Context Engine | PENDING | Block management, zones, token counting, classification |
 | 3 | Dynamic Compression | PENDING | Multi-level compression, slider UI, async LLM |
@@ -921,15 +922,39 @@ make test-ui     # Frontend tests
 
 ---
 
-### Next Session TODO
+### 2026-02-07: Phase 0.5 — Foundation Hardening Complete
 
-#### Testing & Stability
+**Completed:**
+- [x] **Composable extraction** — Extracted ~600 LOC from +page.svelte into 5 composables in `src/lib/composables/`:
+  - `resizable.svelte.ts` (265 LOC) — Sidebar, zone, terminal resize handlers
+  - `blockHandlers.svelte.ts` (121 LOC) — Block select/drag/context menu
+  - `modalHandlers.svelte.ts` (78 LOC) — Modal action handlers
+  - `keyboardHandlers.svelte.ts` (177 LOC) — J/K navigation, shortcuts
+  - `commandHandlers.svelte.ts` (220 LOC) — Command palette dispatch
+  - +page.svelte script: 752 LOC → 100 LOC
+- [x] **Component subdirectories** — 20 components organized into 5 dirs:
+  - `blocks/` (3): ContextBlock, Zone, Sparkline
+  - `layout/` (4): Modal, TerminalPanel, TitleBar, ZoneManager
+  - `controls/` (6): BlockTypeManager, CommandPalette, ContextMenu, SearchBar, ThemeCustomizer, ThemeToggle
+  - `features/` (3): ContextDiff, Terminal, ZoneMinimap
+  - `ui/` (4): CanvasOverlay, DensityControl, Toast, TokenBudgetBar
+- [x] **Debounced localStorage** — All 38 direct saveToLocalStorage() calls replaced with markDirty() + 1500ms debounce in context, zones, editHistory stores
+- [x] **structuredClone()** — Replaced all JSON.parse(JSON.stringify()) deep clones
+- [x] **Search debounce** — Increased from 150ms to 250ms
+- [x] **Batch mode** — Added batchMode to uiStore, Zone.svelte accepts transitionDuration prop (0 during batch, 150 default)
+- [x] **Backend scaffolding:**
+  - `engine/` module: Block struct, Role/Zone/CompressionLevel/PinPosition enums
+  - `events/` module: ApertureEvent enum (5 variants)
+  - `proxy/handler.rs`: Extracted from mod.rs, added RequestTooLarge/UpstreamTimeout/ParsingFailed errors
+  - Added dashmap dependency for Phase 1
+- [x] **Verification:** All 10 checks pass (svelte-check, vite build, clippy, fmt, tests, LOC count, import resolution, no anti-patterns)
+- [x] **Fix: structuredClone → $state.snapshot** — `structuredClone()` throws `DataCloneError` on Svelte 5 `$state` proxies, silently breaking all snapshot operations (save, switch, restore). Replaced with `$state.snapshot()` in context store (6 instances) and zones store (5 instances).
+
+**Phase 0.5 status: COMPLETE**
+
+---
+
+### Next Session
+
+- [ ] Begin Phase 1 (Proxy Core)
 - [ ] Test all features in `npm run tauri dev` (full desktop app)
-- [ ] Performance check with many blocks
-
-#### Future: Snapshot System Phase 2
-- [ ] Visual branch tree (SVG/Canvas showing snapshot lineage, parent→child)
-- [ ] File sandboxing (Tauri backend with git worktrees)
-- [ ] Cross-snapshot element picking (drag blocks between snapshots)
-
-**Phase 0 status: COMPLETE** — All core features + 10/10 enhancements + 3/3 advanced visuals + snapshot branching implemented

@@ -21,6 +21,33 @@ const STORAGE_KEY = "aperture-edit-history";
 const MAX_ENTRIES_PER_BLOCK = 50;
 
 // ============================================================================
+// Debounced persistence
+// ============================================================================
+
+let _dirty = false;
+let _saveTimer: ReturnType<typeof setTimeout> | undefined;
+
+function markDirty(): void {
+  _dirty = true;
+  if (_saveTimer) clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(() => {
+    saveToLocalStorage();
+    _dirty = false;
+  }, 1500);
+}
+
+function flushPendingWrites(): void {
+  if (_dirty) {
+    saveToLocalStorage();
+    _dirty = false;
+  }
+  if (_saveTimer) {
+    clearTimeout(_saveTimer);
+    _saveTimer = undefined;
+  }
+}
+
+// ============================================================================
 // State
 // ============================================================================
 
@@ -87,7 +114,7 @@ function recordEdit(
   undoStack = [...undoStack, entry];
   redoStack = [];
 
-  saveToLocalStorage();
+  markDirty();
 }
 
 function getBlockHistory(blockId: string): EditEntry[] {
@@ -98,7 +125,7 @@ function clearBlockHistory(blockId: string): void {
   if (!(blockId in history)) return;
   const { [blockId]: _, ...rest } = history;
   history = rest;
-  saveToLocalStorage();
+  markDirty();
 }
 
 function popUndo(): EditEntry | null {
@@ -133,6 +160,7 @@ export const editHistoryStore = {
   },
 
   init,
+  flushPendingWrites,
   recordEdit,
   getBlockHistory,
   clearBlockHistory,

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import Terminal from "./Terminal.svelte";
+  import Terminal from "../features/Terminal.svelte";
   import { terminalStore } from "$lib/stores/terminal.svelte";
 
   let terminalRef = $state<ReturnType<typeof Terminal> | null>(null);
