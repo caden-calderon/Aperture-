@@ -7,27 +7,37 @@
 
 ---
 
-## Context from Phase 0
+## Context from Phase 0 + Phase 0.5
 
 Phase 0 delivers the complete visual UI with mock data:
-- Tauri v2 + Svelte 5 app shell
-- All core components (TokenBudgetBar, Zone, ContextBlock, Sidebar, Toolbar)
-- Selection, drag-drop, keyboard shortcuts working
-- Canvas effects layer (halftone, dissolution, materialization)
-- Mock data system
+- Tauri v2 + Svelte 5 app shell, 20 components in 5 subdirectories
+- 6 composables extracted from +page.svelte (~100 LOC script)
+- Selection, drag-drop, keyboard shortcuts, embedded terminal
+- Snapshot branching, context diff, syntax highlighting
+- Mock data system with localStorage persistence (debounced)
 
-**Proxy spike already exists** (`src-tauri/src/proxy/`):
-- Basic axum server on port 5400
-- SSE streaming passthrough
-- Request/response logging
-- Unit tests passing
+**Proxy already exists** (`src-tauri/src/proxy/`):
+- `mod.rs` — ProxyState, UpstreamConfig, start_proxy() on port 5400
+- `handler.rs` — proxy_handler, forward_request, determine_upstream (Anthropic/OpenAI auto-detection)
+- `error.rs` — ProxyError with RequestTooLarge, UpstreamTimeout, ParsingFailed variants
+- SSE streaming passthrough, request/response logging, unit tests passing
+
+**Backend skeletons exist** (from Phase 0.5):
+- `engine/block.rs` — Universal Block struct with all fields + serde derives
+- `engine/types.rs` — Role, Zone, CompressionLevel, PinPosition enums
+- `events/types.rs` — ApertureEvent enum with 5 variants + channel constants
+- `dashmap` dependency already added to Cargo.toml
 
 **Key imports:**
 ```rust
-use crate::proxy::{ProxyServer, ProxyError};
+use crate::proxy::{ProxyState, start_proxy};
+use crate::proxy::error::ProxyError;
+use crate::engine::block::Block;
+use crate::engine::types::{Role, Zone, CompressionLevel};
+use crate::events::types::{ApertureEvent, channels};
 ```
 
-**Integration point:** Phase 1 extends the proxy spike to connect with the UI.
+**Integration point:** Phase 1 extends the existing proxy and skeletons to connect with the UI.
 
 ---
 
@@ -57,18 +67,19 @@ Extend `src-tauri/src/proxy/` to:
 Create `src-tauri/src/proxy/parser.rs`:
 - Parse Anthropic message format into blocks
 - Parse OpenAI message format into blocks
-- Normalize both into universal Block format (re-export from `engine::block`)
+- Normalize both into universal Block format (use `engine::block::Block`)
 - Handle tool_use and tool_result blocks
 - Extract token counts from responses
 
-**Note:** The canonical `Block` struct is defined in Phase 2's `engine::block.rs`. Phase 1's parser module re-exports it for convenience: `use crate::engine::Block` internally, `pub use crate::engine::Block` for external consumers.
+**Note:** The canonical `Block` struct already exists in `engine::block.rs` (created in Phase 0.5). Phase 1's parser uses it directly: `use crate::engine::block::Block`.
 
-### 3. WebSocket Event System
+### 3. Event System
 
-Create `src-tauri/src/events/`:
-- WebSocket server for real-time UI updates
-- Event types: `blocks_updated`, `request_captured`, `response_streaming`, `response_complete`
+Extend `src-tauri/src/events/` (skeleton exists from Phase 0.5):
+- `types.rs` already defines ApertureEvent enum + channel constants — extend as needed
+- Add event dispatcher (broadcasts to all connected frontend clients via Tauri events)
 - Tauri IPC bridge to frontend stores
+- Consider WebSocket for external consumers (non-Tauri clients)
 
 ### 4. Frontend Integration
 
@@ -104,12 +115,13 @@ Allow edits to take effect on the next request:
 |------|--------|---------|
 | `src-tauri/src/proxy/parser.rs` | **NEW** | Message array → Block parsing |
 | `src-tauri/src/proxy/capture.rs` | **NEW** | Request/response capture logic |
-| `src-tauri/src/events/mod.rs` | **NEW** | Event system module |
-| `src-tauri/src/events/websocket.rs` | **NEW** | WebSocket server |
-| `src-tauri/src/events/types.rs` | **NEW** | Event type definitions |
 | `src-tauri/src/proxy/mod.rs` | Modify | Integrate capture + events |
-| `src/lib/stores/context.ts` | Modify | WebSocket subscription |
-| `src/lib/stores/connection.ts` | **NEW** | Connection state management |
+| `src-tauri/src/proxy/handler.rs` | Modify | Add capture hooks (exists from Phase 0.5) |
+| `src-tauri/src/events/mod.rs` | Modify | Extend with dispatcher (exists from Phase 0.5) |
+| `src-tauri/src/events/types.rs` | Modify | Extend event variants as needed (exists from Phase 0.5) |
+| `src-tauri/src/events/dispatcher.rs` | **NEW** | Event broadcasting to frontend |
+| `src/lib/stores/context.svelte.ts` | Modify | Tauri event subscription |
+| `src/lib/stores/connection.svelte.ts` | **NEW** | Connection state management |
 
 ---
 

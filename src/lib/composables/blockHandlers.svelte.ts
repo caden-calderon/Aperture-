@@ -99,6 +99,53 @@ export function createBlockHandlers(stores: BlockHandlerStores) {
     uiStore.toggleZoneCollapse(zone);
   }
 
+  // Context menu action handlers
+  function handleContextMenuPin(pos: "top" | "bottom" | null) {
+    if (contextMenuBlock) {
+      contextStore.pinBlock(contextMenuBlock, pos);
+      const label = pos ? `Pinned to ${pos}` : 'Unpinned';
+      uiStore.showToast(label, 'success');
+    }
+  }
+
+  function handleContextMenuMove(zone: ZoneType) {
+    if (contextMenuBlock) {
+      contextStore.moveBlock(contextMenuBlock, zone);
+      const zoneName = zonesStore.getZoneById(zone)?.label ?? zone;
+      uiStore.showToast(`Moved to ${zoneName}`, 'info');
+    }
+  }
+
+  function handleContextMenuCompress(level: Block["compressionLevel"]) {
+    if (contextMenuBlock) {
+      contextStore.setCompressionLevel(contextMenuBlock, level);
+      uiStore.showToast(`Set to ${level}`, 'success');
+    }
+  }
+
+  function handleContextMenuCopy() {
+    if (contextMenuBlock) {
+      const block = contextStore.getBlock(contextMenuBlock);
+      if (block) {
+        navigator.clipboard.writeText(block.content);
+        uiStore.showToast('Copied to clipboard', 'success');
+      }
+    }
+  }
+
+  function handleContextMenuRemove() {
+    if (contextMenuBlock) {
+      contextStore.removeBlock(contextMenuBlock);
+      uiStore.showToast('Block removed', 'success');
+    }
+  }
+
+  function handleContextMenuOpen() {
+    if (contextMenuBlock) {
+      uiStore.openModal(contextMenuBlock);
+    }
+  }
+
   return {
     // Context menu state
     get contextMenuBlock() { return contextMenuBlock; },
@@ -117,5 +164,11 @@ export function createBlockHandlers(stores: BlockHandlerStores) {
     handleZoneReorder,
     handleCreateBlock,
     handleToggleZoneCollapse,
+    handleContextMenuPin,
+    handleContextMenuMove,
+    handleContextMenuCompress,
+    handleContextMenuCopy,
+    handleContextMenuRemove,
+    handleContextMenuOpen,
   };
 }

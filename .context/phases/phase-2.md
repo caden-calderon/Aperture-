@@ -43,8 +43,10 @@ use crate::events::{EventDispatcher, ContextEvent};
 
 ### 1. Block Management System
 
-Create `src-tauri/src/engine/`:
-- In-memory block storage with efficient lookup
+Extend `src-tauri/src/engine/` (skeleton exists from Phase 0.5):
+- `block.rs` already defines canonical Block struct with all fields + serde derives
+- `types.rs` already defines Role, Zone, CompressionLevel, PinPosition enums
+- Add in-memory block storage with efficient lookup (`store.rs`)
 - CRUD operations for blocks
 - Batch operations (select multiple, compress multiple)
 - Block versioning (track edits)
@@ -153,8 +155,9 @@ Simple threshold warnings (Phase 9 adds advanced analytics):
 
 | File | Action | Purpose |
 |------|--------|---------|
-| `src-tauri/src/engine/mod.rs` | **NEW** | Engine module root |
-| `src-tauri/src/engine/block.rs` | **NEW** | Block struct + operations |
+| `src-tauri/src/engine/mod.rs` | Modify | Extend module root (exists from Phase 0.5) |
+| `src-tauri/src/engine/block.rs` | Modify | Extend Block struct + add operations (exists from Phase 0.5) |
+| `src-tauri/src/engine/types.rs` | Modify | Extend type enums as needed (exists from Phase 0.5) |
 | `src-tauri/src/engine/store.rs` | **NEW** | In-memory block storage |
 | `src-tauri/src/engine/zone.rs` | **NEW** | Zone management |
 | `src-tauri/src/engine/tokens.rs` | **NEW** | Token counting |
@@ -175,8 +178,8 @@ Simple threshold warnings (Phase 9 adds advanced analytics):
 
 ### Step 1: Block & Store (~15k context)
 
-1. Define complete Block struct with all fields
-2. Implement BlockStore with HashMap-based storage
+1. Extend existing Block struct (already defined in `engine/block.rs` from Phase 0.5) with any additional fields needed
+2. Implement BlockStore with HashMap-based storage (using `dashmap` already in Cargo.toml)
 3. CRUD operations with proper event emission
 4. Batch operations (get_many, update_many)
 5. Unit tests for store operations

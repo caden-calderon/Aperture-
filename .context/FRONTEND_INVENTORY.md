@@ -5,44 +5,63 @@
 
 ---
 
-## Components (17 total + 1 utility module)
+## Components (20 total, organized in 5 subdirectories)
 
 | Component | Location | Purpose | Backend Needs |
 |-----------|----------|---------|---------------|
-| `TitleBar` | `components/TitleBar.svelte` | Custom Tauri window title bar (−, □, ×) + status dropdown from "Aperture" text | None (Tauri native) |
-| `TokenBudgetBar` | `components/TokenBudgetBar.svelte` | Token usage bar with canvas halftone | Real token counts from proxy |
-| `Zone` | `components/Zone.svelte` | Collapsible zone container, resize, drag-drop, thread lines, slide transitions | Block data from context engine |
-| `ContextBlock` | `components/ContextBlock.svelte` | Individual block with collapse, expand, drag ghost, syntax highlight, language badge, focus ring, right-click | Block data, compression levels |
-| `Modal` | `components/Modal.svelte` | Block detail view/edit with syntax-highlighted editing, role dropdown, zone selector, language badge | Block CRUD operations |
-| `Toast` | `components/Toast.svelte` | Notification system with auto-dismiss | Event stream from proxy |
-| `CommandPalette` | `components/CommandPalette.svelte` | Ctrl+K quick actions (28 commands across 6 categories) | Command execution |
-| `SearchBar` | `components/SearchBar.svelte` | Context search (Ctrl+F) with regex, case-sensitive, zone/type filters | None (client-side filtering) |
-| `ThemeToggle` | `components/ThemeToggle.svelte` | Dark/light mode toggle (sun/moon icons) | None (client-side) |
-| `ThemeCustomizer` | `components/ThemeCustomizer.svelte` | Full theme editor with 13 presets, 18 color pickers, custom save/delete | None (client-side) |
-| `DensityControl` | `components/DensityControl.svelte` | UI density slider (75%-125%) | None (client-side) |
-| `BlockTypeManager` | `components/BlockTypeManager.svelte` | Custom block types CRUD in sidebar | Persist to config |
-| `ZoneManager` | `components/ZoneManager.svelte` | Custom zones CRUD with drag reorder in sidebar | Persist to config |
-| `CanvasOverlay` | `components/CanvasOverlay.svelte` | Canvas effects layer (halftone, dissolution) | None (visual only) |
-| **`ContextMenu`** | **`components/ContextMenu.svelte`** | **Right-click menu: pin, move, compress, copy, remove. Hover submenus.** | **None (UI only)** |
-| `Terminal` | `components/Terminal.svelte` | xterm.js wrapper — PTY spawn, resize, theme sync, reconnect | **Uses Tauri IPC** |
-| `TerminalPanel` | `components/TerminalPanel.svelte` | Terminal chrome — collapsed/expanded bar, clear/position/close | None (wraps Terminal) |
+| **blocks/** | | | |
+| `ContextBlock` | `components/blocks/ContextBlock.svelte` | Individual block with collapse, expand, drag ghost, syntax highlight, language badge, focus ring, right-click | Block data, compression levels |
+| `Zone` | `components/blocks/Zone.svelte` | Collapsible zone container, resize, drag-drop, thread lines, slide transitions (transitionDuration prop) | Block data from context engine |
+| `Sparkline` | `components/blocks/Sparkline.svelte` | Inline SVG sparkline (40×14px) in zone headers showing token history | Token data from engine |
+| **layout/** | | | |
+| `Modal` | `components/layout/Modal.svelte` | Block detail view/edit with syntax-highlighted editing, role dropdown, zone selector, language badge | Block CRUD operations |
+| `TerminalPanel` | `components/layout/TerminalPanel.svelte` | Terminal chrome — collapsed/expanded bar, clear/position/close | None (wraps Terminal) |
+| `TitleBar` | `components/layout/TitleBar.svelte` | Custom Tauri window title bar (−, □, ×) + status dropdown from "Aperture" text | None (Tauri native) |
+| `ZoneManager` | `components/layout/ZoneManager.svelte` | Custom zones CRUD with drag reorder in sidebar | Persist to config |
+| **controls/** | | | |
+| `BlockTypeManager` | `components/controls/BlockTypeManager.svelte` | Custom block types CRUD in sidebar | Persist to config |
+| `CommandPalette` | `components/controls/CommandPalette.svelte` | Ctrl+K quick actions (28 commands across 6 categories) | Command execution |
+| `ContextMenu` | `components/controls/ContextMenu.svelte` | Right-click menu: pin, move, compress, copy, remove. Hover submenus. | None (UI only) |
+| `SearchBar` | `components/controls/SearchBar.svelte` | Context search (Ctrl+F) with regex, case-sensitive, zone/type filters | None (client-side filtering) |
+| `ThemeCustomizer` | `components/controls/ThemeCustomizer.svelte` | Full theme editor with 13 presets, 18 color pickers, custom save/delete | None (client-side) |
+| `ThemeToggle` | `components/controls/ThemeToggle.svelte` | Dark/light mode toggle (sun/moon icons) | None (client-side) |
+| **features/** | | | |
+| `ContextDiff` | `components/features/ContextDiff.svelte` | Modal comparing current blocks vs snapshot (added/removed/modified) + advanced From/To mode | Snapshot data from engine |
+| `Terminal` | `components/features/Terminal.svelte` | xterm.js wrapper — PTY spawn, resize, theme sync, reconnect | **Uses Tauri IPC** |
+| `ZoneMinimap` | `components/features/ZoneMinimap.svelte` | Sidebar vertical bar chart, proportional zone segments, click-to-scroll, drag-drop target | Zone/token data |
+| **ui/** | | | |
+| `CanvasOverlay` | `components/ui/CanvasOverlay.svelte` | Canvas effects layer (halftone, dissolution) | None (visual only) |
+| `DensityControl` | `components/ui/DensityControl.svelte` | UI density slider (75%-125%) | None (client-side) |
+| `Toast` | `components/ui/Toast.svelte` | Notification system with auto-dismiss | Event stream from proxy |
+| `TokenBudgetBar` | `components/ui/TokenBudgetBar.svelte` | Token usage bar with canvas halftone | Real token counts from proxy |
 
-All component paths are relative to `src/lib/`.
+All component paths are relative to `src/lib/`. Barrel export via `components/index.ts`.
+
+### Composables (5 files in `src/lib/composables/`)
+
+| Composable | Purpose |
+|------------|---------|
+| `resizable.svelte.ts` | Sidebar, zone, terminal resize handlers + state |
+| `blockHandlers.svelte.ts` | Block select/drag/context menu handlers + context menu action handlers |
+| `modalHandlers.svelte.ts` | Modal compress/move/pin/remove/edit/role handlers |
+| `keyboardHandlers.svelte.ts` | J/K navigation, Ctrl+T/F/K, shortcuts + `allBlocksFlat` derived |
+| `commandHandlers.svelte.ts` | Command palette dispatch (28 commands) |
 
 ---
 
-## Stores (8 total)
+## Stores (9 total)
 
 | Store | Location | Purpose | Backend Needs |
 |-------|----------|---------|---------------|
-| `contextStore` | `stores/context.svelte.ts` | Blocks, snapshots, CRUD, persistence | **PRIMARY** — Proxy data feed, replace mock data |
+| `contextStore` | `stores/context.svelte.ts` | Blocks, snapshots, CRUD, persistence (debounced 1500ms) | **PRIMARY** — Proxy data feed, replace mock data |
 | `selectionStore` | `stores/selection.svelte.ts` | Multi-select state, shift/ctrl-click, keyboard focus (`focusedId`) | None (UI only) |
-| `uiStore` | `stores/ui.svelte.ts` | Modals, toasts, drag, sidebar, context panel collapse, density | None (UI only) |
+| `uiStore` | `stores/ui.svelte.ts` | Modals, toasts, drag, sidebar, context panel collapse, density, batchMode | None (UI only) |
 | `themeStore` | `stores/theme.svelte.ts` | 13 presets, 18 color keys, custom themes, xterm theme mapping | Persist to user config |
 | `blockTypesStore` | `stores/blockTypes.svelte.ts` | Built-in + custom block types | Persist to user config |
-| `zonesStore` | `stores/zones.svelte.ts` | Built-in + custom zones, heights, expand states, schema v3 | Persist to user config |
-| `searchStore` | `stores/search.svelte.ts` | Search query, filters, match navigation | None (client-side) |
+| `zonesStore` | `stores/zones.svelte.ts` | Built-in + custom zones, heights, expand states, token history, schema v4 (debounced 1500ms) | Persist to user config |
+| `searchStore` | `stores/search.svelte.ts` | Search query, filters, match navigation (250ms debounce) | None (client-side) |
 | `terminalStore` | `stores/terminal.svelte.ts` | Terminal session, visibility, size, position, collapse tracking | None (uses Tauri IPC directly) |
+| `editHistoryStore` | `stores/editHistory.svelte.ts` | Block edit history (content, zone, compression, role, pin changes), max 50 entries/block, undo/redo stacks (debounced 1500ms) | Persist to engine |
 
 All store paths are relative to `src/lib/`.
 
@@ -141,7 +160,7 @@ interface Block {
 
 ---
 
-## localStorage Keys (14 total)
+## localStorage Keys (15 total)
 
 | Key | Store | Data |
 |-----|-------|------|
@@ -159,6 +178,7 @@ interface Block {
 | `aperture-terminal-width` | terminalStore | Terminal panel width (right mode) |
 | `aperture-terminal-visible` | terminalStore | Terminal visibility boolean |
 | `aperture-terminal-position` | terminalStore | Terminal position: `bottom` or `right` |
+| `aperture-edit-history` | editHistoryStore | Block edit history entries (Record<blockId, EditEntry[]>) |
 
 ---
 

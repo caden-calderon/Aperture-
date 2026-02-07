@@ -3,7 +3,7 @@
   import { TokenBudgetBar, Zone, Modal, Toast, CommandPalette, ThemeToggle, DensityControl, TitleBar, ThemeCustomizer, BlockTypeManager, ZoneManager, SearchBar, TerminalPanel, ContextMenu, ZoneMinimap, ContextDiff } from "$lib/components";
   import { contextStore, selectionStore, uiStore, themeStore, blockTypesStore, zonesStore, searchStore, terminalStore, editHistoryStore } from "$lib/stores";
   import { createResizable, createBlockHandlers, createModalHandlers, createKeyboardHandlers, createCommandHandlers } from "$lib/composables";
-  import type { Zone as ZoneType, Block } from "$lib/types";
+  import type { Zone as ZoneType } from "$lib/types";
 
   // -- Composables --
 
@@ -543,46 +543,12 @@
   y={blockHandlers.contextMenuY}
   visible={blockHandlers.contextMenuVisible}
   onClose={blockHandlers.closeContextMenu}
-  onPin={(pos: "top" | "bottom" | null) => {
-    if (blockHandlers.contextMenuBlock) {
-      contextStore.pinBlock(blockHandlers.contextMenuBlock, pos);
-      const label = pos ? `Pinned to ${pos}` : 'Unpinned';
-      uiStore.showToast(label, 'success');
-    }
-  }}
-  onMove={(zone: ZoneType) => {
-    if (blockHandlers.contextMenuBlock) {
-      contextStore.moveBlock(blockHandlers.contextMenuBlock, zone);
-      const zoneName = zonesStore.getZoneById(zone)?.label ?? zone;
-      uiStore.showToast(`Moved to ${zoneName}`, 'info');
-    }
-  }}
-  onCompress={(level: Block["compressionLevel"]) => {
-    if (blockHandlers.contextMenuBlock) {
-      contextStore.setCompressionLevel(blockHandlers.contextMenuBlock, level);
-      uiStore.showToast(`Set to ${level}`, 'success');
-    }
-  }}
-  onCopy={() => {
-    if (blockHandlers.contextMenuBlock) {
-      const block = contextStore.getBlock(blockHandlers.contextMenuBlock);
-      if (block) {
-        navigator.clipboard.writeText(block.content);
-        uiStore.showToast('Copied to clipboard', 'success');
-      }
-    }
-  }}
-  onRemove={() => {
-    if (blockHandlers.contextMenuBlock) {
-      contextStore.removeBlock(blockHandlers.contextMenuBlock);
-      uiStore.showToast('Block removed', 'success');
-    }
-  }}
-  onOpen={() => {
-    if (blockHandlers.contextMenuBlock) {
-      uiStore.openModal(blockHandlers.contextMenuBlock);
-    }
-  }}
+  onPin={blockHandlers.handleContextMenuPin}
+  onMove={blockHandlers.handleContextMenuMove}
+  onCompress={blockHandlers.handleContextMenuCompress}
+  onCopy={blockHandlers.handleContextMenuCopy}
+  onRemove={blockHandlers.handleContextMenuRemove}
+  onOpen={blockHandlers.handleContextMenuOpen}
 />
 
 <style>

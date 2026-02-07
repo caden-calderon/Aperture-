@@ -9,11 +9,11 @@
 
 | Field | Value |
 |-------|-------|
-| **Phase** | 0 — UI Foundation |
-| **Status** | 🔄 IN PROGRESS |
-| **Last Updated** | 2026-02-04 |
+| **Phase** | 0.5 — Foundation Hardening |
+| **Status** | ✅ COMPLETE |
+| **Last Updated** | 2026-02-07 |
 | **Blocking Issues** | None |
-| **Next Step** | Continue UI polish per user feedback |
+| **Next Step** | Begin Phase 1 (Proxy Core) |
 
 ---
 
@@ -35,8 +35,8 @@
 
 | Phase | Name | Status | Focus |
 |-------|------|--------|-------|
-| 0 | UI Foundation | COMPLETE | Tauri + Svelte 5 shell, full visual UI with mock data, theme customizer |
-| 0.5 | Foundation Hardening | COMPLETE | Composable extraction, performance, backend scaffolding |
+| 0 | UI Foundation | ✅ COMPLETE | Tauri + Svelte 5 shell, 20 components, full visual UI with mock data, theme customizer |
+| 0.5 | Foundation Hardening | ✅ COMPLETE | Composable extraction, component subdirs, performance fixes, backend scaffolding, documentation |
 | 1 | Proxy Core | PENDING | HTTP intercept, request/response capture, WebSocket events |
 | 2 | Context Engine | PENDING | Block management, zones, token counting, classification |
 | 3 | Dynamic Compression | PENDING | Multi-level compression, slider UI, async LLM |
@@ -954,19 +954,38 @@ make test-ui     # Frontend tests
 
 ---
 
+### 2026-02-07: Phase 0.5 Fully Complete
+
+**Completed (final cleanup):**
+- [x] Extracted inline context menu handlers from +page.svelte to blockHandlers.svelte.ts (6 handlers: pin, move, compress, copy, remove, open)
+- [x] Created `docs/INTEGRATION.md` — Data flow diagram, IPC command reference, events reference, planned Phase 1 events, migration strategy
+- [x] Updated `phase-1.md` — References Phase 0.5 skeletons (engine/, events/, proxy/handler.rs), changes "NEW" to "Extend" for existing modules
+- [x] Updated `phase-2.md` — Notes engine/block.rs and types.rs exist from Phase 0.5, changes "NEW" to "Modify" for existing modules
+- [x] Updated `FRONTEND_INVENTORY.md` — Added editHistoryStore, composables section, updated all component paths to subdirectory structure, added Sparkline/ContextDiff/ZoneMinimap
+- [x] Updated this RESUME.md with final Phase 0.5 status
+
+**Plan files (reference only, all work complete):**
+- `.context/melodic-sleeping-dragonfly.md` — Phase 0.5 plan (Session 1 + Session 2 done)
+- `.context/mighty-painting-phoenix.md` — Phase 0.5 plan (alternate copy, same work)
+
+**Phase 0.5 verification (all pass):**
+- `npm run check` — 0 errors, 0 warnings
+- `npx vite build` — success
+- `cargo clippy -- -D warnings` — clean
+- `cargo fmt --check` — passes
+- `cargo test` — 3/3 pass
+
+---
+
 ### Next Session
 
-**Priority: Finish outstanding items from both Phase 0.5 plans before starting Phase 1.**
+**Begin Phase 1: Proxy Core**
 
-Two plan files contain remaining work:
-1. `.context/melodic-sleeping-dragonfly.md` — Phase 0.5 Foundation Hardening plan (Session 2 docs partially done, review remaining items)
-2. `.context/mighty-painting-phoenix.md` — Additional plan with outstanding tasks
-
-**Workflow:**
-1. Read both plan files
-2. Identify and complete all remaining tasks
-3. Update this file when fully done
-4. Then begin Phase 1 (Proxy Core)
+Read `.context/phases/phase-1.md` for full details. Key starting points:
+- Proxy exists at `src-tauri/src/proxy/` (mod.rs, handler.rs, error.rs)
+- Engine skeleton at `src-tauri/src/engine/` (block.rs, types.rs)
+- Events skeleton at `src-tauri/src/events/` (types.rs with ApertureEvent enum)
+- `dashmap` already in Cargo.toml for concurrent state
 
 **Also pending:**
 - [ ] Test all features in `npm run tauri dev` (full desktop app)
