@@ -119,6 +119,9 @@ Background worker for LLM compression:
 - Status indicator in UI ("3 blocks compressing...")
 - Never blocks proxy or UI
 
+This phase establishes the compression queue contract and local execution path.
+Phase 7 upgrades execution with a dedicated sidecar runtime and tiered model routing.
+
 ### 6. Preserve-Keys System
 
 Always keep certain content verbatim:
@@ -188,7 +191,7 @@ Quality scoring to flag potentially bad compressions (will evolve over time):
 
 ### Step 3: LLM Compression (~15k context)
 
-1. Create LLM client abstraction (Anthropic, OpenAI, Ollama)
+1. Create LLM client abstraction used by compression
 2. Implement summarization prompts
 3. Implement minimal description prompts
 4. Add quality scoring (reject bad compressions)

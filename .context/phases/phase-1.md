@@ -1,8 +1,8 @@
 # Phase 1: Proxy Core
 
 **Status**: PENDING
-**Goal**: HTTP proxy that intercepts API calls, streams responses, and updates UI in real-time
-**Prerequisites**: Phase 0 complete
+**Goal**: Production proxy runtime that intercepts API calls, streams responses, and bridges live data into frontend stores
+**Prerequisites**: Phase 0.5 complete
 **Estimated Scope**: ~60-70k context (proxy + parsing + events + UI integration)
 
 ---
@@ -45,7 +45,7 @@ use crate::events::types::{ApertureEvent, channels};
 
 1. **No live data flow** — UI shows mock data, not real API traffic
 2. **No request capture** — Proxy forwards but doesn't extract context for engine
-3. **No UI updates** — No WebSocket/IPC to push state changes to frontend
+3. **No UI updates** — No stable event bridge to push state changes to frontend stores
 4. **No provider detection** — Need to auto-detect Anthropic vs OpenAI from requests
 5. **No pause/hold** — Can't intercept requests for inspection before forwarding
 
@@ -77,14 +77,14 @@ Create `src-tauri/src/proxy/parser.rs`:
 
 Extend `src-tauri/src/events/` (skeleton exists from Phase 0.5):
 - `types.rs` already defines ApertureEvent enum + channel constants — extend as needed
-- Add event dispatcher (broadcasts to all connected frontend clients via Tauri events)
-- Tauri IPC bridge to frontend stores
-- Consider WebSocket for external consumers (non-Tauri clients)
+- Add event dispatcher (broadcasts to frontend via Tauri events)
+- Add strongly typed payloads for store consumption
+- Keep WebSocket optional for external consumers (defer if not required for core app)
 
 ### 4. Frontend Integration
 
 Update Svelte stores:
-- `src/lib/stores/context.ts` — Subscribe to WebSocket events
+- `src/lib/stores/context.svelte.ts` — Subscribe to backend events
 - Replace mock data with live data from proxy
 - Show real-time streaming indicator during responses
 - Handle connection state (connected/disconnected/reconnecting)
@@ -145,15 +145,15 @@ Allow edits to take effect on the next request:
 
 ### Step 3: Event System (~15k context)
 
-1. Set up WebSocket server alongside HTTP proxy
+1. Set up Tauri event dispatcher alongside HTTP proxy capture path
 2. Define event types with serde serialization
-3. Create event dispatcher (broadcasts to all connected clients)
-4. Integrate with Tauri IPC
+3. Create event dispatcher (broadcasts to UI listeners)
+4. Add optional WebSocket bridge only if external client support is required
 5. Unit tests for event serialization
 
 ### Step 4: Frontend Integration (~10k context)
 
-1. Create WebSocket client in Svelte
+1. Subscribe stores to Tauri events
 2. Update context store to receive live events
 3. Add connection status indicator to UI
 4. Handle reconnection logic
@@ -170,14 +170,14 @@ Allow edits to take effect on the next request:
 | `src-tauri/src/proxy/parser.rs` | 10 | Message parsing edge cases |
 | `src-tauri/src/proxy/capture.rs` | 8 | Request/response capture |
 | `src-tauri/src/events/types.rs` | 4 | Event serialization |
-| `src-tauri/src/events/websocket.rs` | 3 | WebSocket basics |
+| `src-tauri/src/events/dispatcher.rs` | 3 | Event dispatch basics |
 
 ### Integration Tests (~8 tests)
 
 | File | Tests | Focus |
 |------|-------|-------|
 | `tests/integration/test_proxy_flow.rs` | 5 | Full request → parse → event flow |
-| `tests/integration/test_websocket.rs` | 3 | WebSocket connection + events |
+| `tests/integration/test_event_bridge.rs` | 3 | Tauri event bridge + store updates |
 
 ### Manual Tests (6 tests)
 
@@ -187,7 +187,7 @@ Allow edits to take effect on the next request:
 | `test_openai_passthrough` | Real OpenAI API call through proxy |
 | `test_sse_streaming` | Verify streaming responses display in UI |
 | `test_ui_live_update` | Verify UI updates when request captured |
-| `test_reconnection` | Disconnect/reconnect WebSocket, verify state |
+| `test_reconnection` | Restart proxy/event listeners, verify state recovery |
 | `test_pause_mode` | Enable pause, verify request held until released |
 
 ---
@@ -197,7 +197,7 @@ Allow edits to take effect on the next request:
 - [ ] Proxy intercepts and forwards Anthropic API calls
 - [ ] Proxy intercepts and forwards OpenAI-compatible API calls
 - [ ] Message arrays parsed into universal Block format
-- [ ] UI receives real-time updates via WebSocket
+- [ ] UI receives real-time updates via event bridge
 - [ ] Streaming responses show progress indicator
 - [ ] Connection status visible in UI
 - [ ] Pause mode holds request until manual release

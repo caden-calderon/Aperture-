@@ -12,7 +12,7 @@ Universal LLM context visualization, management, and control proxy.
 
 | File | Purpose |
 |------|---------|
-| `APERTURE.md` | Full design doc (75k words — architecture, features, interactions, roadmap) |
+| `docs/archive/APERTURE-brainstorm.md` | Archived original design brainstorm (legacy reference, not source of truth) |
 | `.claude/skills/aperture-ui.md` | UI design system (colors, typography, animations, dithering spec) |
 | `.context/RESUME.md` | Current state, what to read, next steps |
 | `.context/phases/phase-N.md` | Phase-specific implementation details |

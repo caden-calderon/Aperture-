@@ -32,7 +32,7 @@ use crate::analytics::warnings::{Warning, WarningConfig};
 1. **No task awareness** — Aperture doesn't know what the agent is working on
 2. **No context transitions** — Task completion doesn't trigger context cleanup
 3. **No predictive loading** — Don't pre-stage context for upcoming tasks
-4. **No pause/swap** — Can't interrupt agent to swap context cleanly
+4. **Pause exists but not task-aware** — No transactional pause/swap flow tied to task hooks
 5. **No historical patterns** — Don't learn from past task→file associations
 
 ---
@@ -86,9 +86,9 @@ Based on task list, pre-compute next task's context:
 - Pre-generate compression levels
 - Historical patterns: "when working on auth, you always reference middleware config within 3 turns"
 
-### 4. Pause/Swap System
+### 4. Transactional Pause/Swap
 
-Interrupt agent for context surgery:
+Extend existing pause/hold capability into a transactional flow:
 - "Pause" holds next outbound request
 - Swap context while paused
 - "Resume" continues with modified context
@@ -118,7 +118,7 @@ Learn from past sessions:
 | `src-tauri/src/tasks/hooks.rs` | **NEW** | Completion hooks |
 | `src-tauri/src/tasks/prefetch.rs` | **NEW** | Pre-staging logic |
 | `src-tauri/src/tasks/patterns.rs` | **NEW** | Historical patterns |
-| `src-tauri/src/proxy/pause.rs` | **NEW** | Pause/swap system |
+| `src-tauri/src/proxy/pause.rs` | Modify | Transactional pause/swap orchestration |
 | `src/lib/components/TaskPanel.svelte` | **NEW** | Task display |
 | `src/lib/components/PauseControls.svelte` | **NEW** | Pause UI |
 
@@ -151,9 +151,9 @@ Learn from past sessions:
 4. Integrate with staging area
 5. Unit tests for pre-staging
 
-### Step 4: Pause/Swap (~10k context)
+### Step 4: Transactional Pause/Swap (~10k context)
 
-1. Implement request hold system
+1. Reuse request hold system from Phase 1
 2. Create swap logic
 3. Build pause UI
 4. Add resume flow
@@ -208,7 +208,7 @@ Learn from past sessions:
 - [ ] Hooks fire on task completion
 - [ ] Context compressed for completed tasks
 - [ ] Next task context pre-staged
-- [ ] Pause holds outbound requests
+- [ ] Pause/hold integrates with task hooks without deadlocks
 - [ ] Swap modifies context while paused
 - [ ] Historical patterns tracked and surfaced
 - [ ] `make check` passes

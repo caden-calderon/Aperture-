@@ -33,7 +33,7 @@ use crate::proxy::pause::PauseController;
 2. **No compression validation** — Can't verify compressed content preserves quality
 3. **No git awareness** — Context not tied to code state
 4. **No learning** — Don't adapt to user behavior over time
-5. **No block versioning** — Can't track edits to blocks
+5. **Versioning lacks advanced workflows** — Need richer diff UX and correction-pattern intelligence
 
 ---
 
@@ -96,9 +96,9 @@ Learn from user behavior:
 
 Accept or reject suggestions — it learns from that too.
 
-### 5. Block Versioning
+### 5. Advanced Block Versioning
 
-Track edits to blocks:
+Extend Phase 2 versioning:
 - Version history for hot-patched blocks
 - See diff between versions
 - Undo specific edits
@@ -122,7 +122,7 @@ Enables: "Add a project structure doc to staging?"
 | `src-tauri/src/learning/mod.rs` | **NEW** | Adaptive learning |
 | `src-tauri/src/learning/patterns.rs` | **NEW** | Pattern detection |
 | `src-tauri/src/learning/suggestions.rs` | **NEW** | Suggestion generation |
-| `src-tauri/src/engine/versioning.rs` | **NEW** | Block versioning |
+| `src-tauri/src/engine/versioning.rs` | Modify | Advanced versioning + diff metadata |
 | `src/lib/components/PromptComposer.svelte` | **NEW** | Prompt builder UI |
 | `src/lib/components/ABComparison.svelte` | **NEW** | A/B comparison UI |
 | `src/lib/components/LearningSuggestions.svelte` | **NEW** | Suggestions UI |

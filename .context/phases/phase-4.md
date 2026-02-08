@@ -90,7 +90,7 @@ When the agent switches tasks (e.g., finishes "safety" work, starts "plugins"):
 - Manual always overrides automatic detection
 
 **Rebalancing flow:**
-1. Pause outbound request (or trigger on task completion hook)
+1. Pause outbound request using Phase 1 hold primitive (or trigger on task completion hook)
 2. Identify old topic's blocks → compress to summarized/minimal
 3. Identify new topic's blocks → expand to original/trimmed
 4. Resume with rebalanced context

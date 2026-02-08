@@ -124,9 +124,9 @@ Track and reuse searches:
 | `src-tauri/src/nlp/parser.rs` | **NEW** | NL command parser |
 | `src-tauri/src/nlp/commands.rs` | **NEW** | Command definitions |
 | `src-tauri/src/engine/annotation.rs` | **NEW** | Annotation system |
-| `src/lib/components/SearchBar.svelte` | **NEW** | Search UI |
+| `src/lib/components/controls/SearchBar.svelte` | Modify | Existing search UI upgraded for engine-backed search |
 | `src/lib/components/SearchResults.svelte` | **NEW** | Results display |
-| `src/lib/components/CommandPalette.svelte` | Modify | Add NL commands |
+| `src/lib/components/controls/CommandPalette.svelte` | Modify | Add NL commands |
 | `src/lib/components/AnnotationBadge.svelte` | **NEW** | Annotation indicator |
 
 ---

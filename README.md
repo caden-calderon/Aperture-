@@ -2,41 +2,45 @@
 
 > Universal LLM context visualization, management, and control proxy.
 
-**Status:** Phase 0 - UI Foundation
+**Status:** Active development (post-audit hardening + Phase 1 foundation work in progress)
 
-## Overview
+## What It Is
 
-Aperture sits between AI coding tools (Claude Code, Codex, etc.) and their APIs, providing full visibility and control over your context window. See what's eating your tokens, surgically manage what stays and what goes, and define policies for automatic context management.
+Aperture runs as a local proxy between AI coding tools (Claude Code, Codex, etc.) and provider APIs. It provides real-time context visibility, block-level manipulation, snapshot branching, and a path toward policy-driven context management.
 
 ## Tech Stack
 
 - **App Shell:** Tauri v2
 - **Frontend:** Svelte 5 + SvelteKit
 - **Backend/Proxy:** Rust (axum)
-- **Styling:** Tailwind CSS + custom halftone/dithering effects
+- **Testing/Checks:** Vitest + ESLint + svelte-check + cargo clippy/test
 
-## Development
+## Development Commands
 
 ```bash
 # Install dependencies
-npm install
+make install
 
 # Start development server
-npm run tauri dev
+make dev
 
 # Build for production
-npm run tauri build
+make build
 
-# Run quality checks
+# Run full quality gate (lint + typecheck + tests)
 make check
+
+# Run tests only
+make test
 ```
 
 ## Documentation
 
-- `APERTURE.md` — Full design document
 - `docs/ARCHITECTURE.md` — System architecture
-- `.context/RESUME.md` — Project state and phase tracking
-- `.context/phases/` — Phase-specific documentation
+- `docs/INTEGRATION.md` — Frontend/backend integration and IPC contracts
+- `docs/SECURITY_BASELINE.md` — Security constraints and hardening baseline
+- `dev/active/audit-2026-02-08/` — Latest audit execution docs and reports
+- `docs/archive/APERTURE-brainstorm.md` — Original brainstorming/design doc (archived)
 
 ## License
 

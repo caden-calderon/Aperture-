@@ -9,9 +9,9 @@
 
 | Field | Value |
 |-------|-------|
-| **Phase** | 0.5 — Foundation Hardening |
+| **Phase** | 0.5 — Foundation Hardening (complete); execution runway prepared for Phase 1 |
 | **Status** | ✅ COMPLETE |
-| **Last Updated** | 2026-02-07 |
+| **Last Updated** | 2026-02-08 |
 | **Blocking Issues** | None |
 | **Next Step** | Begin Phase 1 (Proxy Core) |
 
@@ -37,20 +37,30 @@
 |-------|------|--------|-------|
 | 0 | UI Foundation | ✅ COMPLETE | Tauri + Svelte 5 shell, 20 components, full visual UI with mock data, theme customizer |
 | 0.5 | Foundation Hardening | ✅ COMPLETE | Composable extraction, component subdirs, performance fixes, backend scaffolding, documentation |
-| 1 | Proxy Core | PENDING | HTTP intercept, request/response capture, WebSocket events |
-| 2 | Context Engine | PENDING | Block management, zones, token counting, classification |
-| 3 | Dynamic Compression | PENDING | Multi-level compression, slider UI, async LLM |
-| 4 | Heat & Clustering | PENDING | Usage heat, position relevance, topic clusters, dedup |
-| 5 | Checkpoints & Forking | PENDING | Hard/soft checkpoints, forking, ghost blocks, trash |
+| 1 | Proxy Core | PENDING | HTTP intercept, request/response capture, event bridge, hot patch wiring |
+| 2 | Context Engine | PENDING | Block/session engine, persistence, deterministic policy/action log foundation |
+| 3 | Dynamic Compression | PENDING | Multi-level compression, preview, queue contract, preserve-keys |
+| 4 | Heat & Clustering | PENDING | Usage heat, relevance, topic clusters, dedup, dynamic rebalancing |
+| 5 | Memory Lifecycle & Checkpoints | PENDING | hot/warm/cold/archive lifecycle, recall, manifest, checkpoints/fork/trash |
 | 6 | Staging & Presets | PENDING | Pre-loaded injection, presets, templates, CLI, profiles |
-| 7 | Cleaner Sidecar | PENDING | Local model, tiered routing, dependency graph |
+| 7 | Cleaner Sidecar | PENDING | Sidecar runtime, tiered routing, semantic enrichment + quality verification |
 | 8 | Search & NLP | PENDING | Full-text/semantic search, NL commands, annotations |
 | 9 | Analytics | PENDING | Cost tracking, timeline, replay, health score, warnings |
-| 10 | Task Integration | PENDING | TODO parsing, completion hooks, pre-fetching, pause/swap |
-| 11 | System Prompts & Git | PENDING | Prompt composition, A/B testing, git integration, learning |
+| 10 | Task Integration | PENDING | TODO parsing, completion hooks, predictive pre-staging, transactional pause/swap |
+| 11 | System Prompts & Git | PENDING | Prompt composition, A/B testing, git integration, adaptive learning, advanced versioning UX |
 | 12 | Plugins & Ecosystem | PENDING | Plugin system, API, community, multi-agent (deferred) |
 
 **Phase docs**: `.context/phases/phase-{N}.md` — All 13 phases documented
+
+### Roadmap Sync Notes (2026-02-08)
+
+- Phase ownership overlaps were removed:
+  - Phase 2 owns deterministic dependency + basic versioning.
+  - Phase 7 extends dependency with semantic enrichment, not a rewrite.
+  - Phase 11 extends versioning UX/insights, not first implementation.
+  - Phase 10 extends pause/swap into task-aware transactions.
+- Paths in phase docs were aligned with current code (e.g., `context.svelte.ts`, controls component paths).
+- Phase 5 now explicitly includes memory lifecycle + archive/recall + manifest as core deliverables.
 
 ### Planning Strategy (COMPLETE)
 1. ~~**Create** detailed phase files for phases 0-12~~ ✅ Done
@@ -64,10 +74,14 @@
 
 ### Starting a Phase (Read in Order)
 1. `.context/RESUME.md` — This file
-2. `APERTURE.md` — Full design document (comprehensive)
-3. `docs/ARCHITECTURE.md` — System architecture overview
-4. `.context/phases/phase-{N}.md` — Current phase details
-5. `.context/CODE_STANDARDS.md` — Before writing code
+2. `.context/phases/README.md` — Execution order + ownership boundaries
+3. `docs/INTEGRATION.md` — Frontend/backend flow and contracts
+4. `docs/ARCHITECTURE.md` — Current architecture source of truth
+5. `.context/phases/phase-{N}.md` — Current phase details
+6. `.context/CODE_STANDARDS.md` — Before writing code
+
+Legacy brainstorm reference:
+- `docs/archive/APERTURE-brainstorm.md` — Historical design ideation (not source of truth)
 
 ### Reference Materials
 - `reference/context-forge-prototype.html` — Working HTML prototype of UI
@@ -96,14 +110,14 @@
 # Prerequisites
 rustup (Rust toolchain)
 node >= 20
-pnpm (preferred) or npm
+npm
 
 # Install dependencies
-pnpm install
+make install
 cd src-tauri && cargo build
 
 # Development
-pnpm tauri dev
+make dev
 
 # Quality checks (run before completing phases)
 make check

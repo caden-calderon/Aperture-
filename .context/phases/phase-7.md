@@ -1,7 +1,7 @@
 # Phase 7: Cleaner Model Sidecar
 
 **Status**: PENDING
-**Goal**: Local model sidecar for background tasks, tiered model selection, and dependency graph
+**Goal**: Local model sidecar for background intelligence, tiered routing, and semantic enrichment of existing engine systems
 **Prerequisites**: Phase 6 complete
 **Estimated Scope**: ~55k context
 
@@ -30,11 +30,11 @@ use crate::engine::template::{Template, TemplateManager};
 
 ## Problem Statement
 
-1. **LLM tasks block UI** — Compression and analysis need async handling
-2. **No local model** — All LLM work requires API calls (expensive)
-3. **No task routing** — Can't send different tasks to different models
-4. **No dependency tracking** — Don't know block relationships
-5. **No quality verification** — Can't validate compression output
+1. **No unified sidecar runtime** — Background model tasks are not centrally orchestrated
+2. **No local model backend** — All higher-quality analysis requires external APIs
+3. **No tiered task routing** — Can't send tasks to cost-appropriate model tiers
+4. **No semantic dependency enrichment** — Deterministic graph exists but lacks semantic relationships
+5. **No robust quality verification** — Can't reliably validate model-generated outputs
 
 ---
 
@@ -101,13 +101,15 @@ Priority-based async processing:
 - Cancellation support
 - Retry with exponential backoff
 
-### 5. Block Dependency Graph
+### 5. Semantic Dependency Enrichment
 
 Track relationships between blocks:
 - **File reference chains** — Read file → later blocks use it
 - **Conversation flow** — User message → assistant response
 - **Tool chains** — tool_use → tool_result → reasoning
 - **Information propagation** — Block B quotes from Block A
+
+Extends Phase 2 deterministic dependency tracking with semantic edges.
 
 Enables:
 - "Removing this will orphan 3 blocks" warnings
@@ -136,7 +138,7 @@ Validate LLM outputs:
 | `src-tauri/src/sidecar/anthropic.rs` | **NEW** | Anthropic API |
 | `src-tauri/src/sidecar/router.rs` | **NEW** | Task → model routing |
 | `src-tauri/src/sidecar/quality.rs` | **NEW** | Quality verification |
-| `src-tauri/src/engine/dependency.rs` | **NEW** | Dependency graph |
+| `src-tauri/src/engine/dependency.rs` | Modify | Add semantic dependency enrichment |
 | `src/lib/components/SidecarStatus.svelte` | **NEW** | Status indicator |
 | `src/lib/components/DependencyView.svelte` | **NEW** | Graph visualization |
 
@@ -169,10 +171,10 @@ Validate LLM outputs:
 4. Integrate with compression system
 5. Unit tests for routing
 
-### Step 4: Dependency Graph (~12k context)
+### Step 4: Dependency Enrichment (~12k context)
 
 1. Define dependency edge types
-2. Implement graph construction
+2. Extend deterministic graph with semantic edge extraction
 3. Add orphan detection
 4. Implement cascade analysis
 5. Create visualization component
@@ -205,7 +207,7 @@ Validate LLM outputs:
 | File | Tests | Focus |
 |------|-------|-------|
 | `tests/integration/test_sidecar.rs` | 4 | End-to-end sidecar flow |
-| `tests/integration/test_dependency.rs` | 4 | Dependency detection |
+| `tests/integration/test_dependency.rs` | 4 | Deterministic + semantic dependency behavior |
 
 ### Manual Tests (6 tests)
 
@@ -227,7 +229,7 @@ Validate LLM outputs:
 - [ ] Anthropic backend works as fallback
 - [ ] Task queue processes with priority ordering
 - [ ] Tiered routing sends tasks to correct models
-- [ ] Dependency graph tracks block relationships
+- [ ] Dependency graph includes deterministic + semantic relationships
 - [ ] Orphan warnings appear on block removal
 - [ ] Quality verification flags bad compressions
 - [ ] `make check` passes

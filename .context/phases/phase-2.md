@@ -1,7 +1,7 @@
 # Phase 2: Context Engine
 
 **Status**: PENDING
-**Goal**: Core engine for block management, zones, token counting, and context classification
+**Goal**: Core engine for block/session management, persistence, classification, and policy-safe context actions
 **Prerequisites**: Phase 1 complete
 **Estimated Scope**: ~55k context
 
@@ -12,7 +12,7 @@
 Phase 1 delivers:
 - Proxy that intercepts and forwards API calls
 - Request/response parsing into universal Block format
-- WebSocket event system for real-time UI updates
+- Event bridge for real-time UI updates
 - Provider auto-detection (Anthropic vs OpenAI)
 - Pause/hold mode for request inspection
 
@@ -36,6 +36,7 @@ use crate::events::{EventDispatcher, ContextEvent};
 6. **No edit tracking** — Users can modify blocks but no undo/history
 7. **No dependency awareness** — Don't know which blocks reference others
 8. **No budget alerts** — No warnings when approaching token limit
+9. **No action policy layer** — No centralized guardrails/undo log for automated mutations
 
 ---
 
@@ -85,7 +86,7 @@ staleness = (turns_since_created × token_cost) / relevance_boost
 
 ### 5. Context Sorting Pipeline
 
-Fast classification pipeline (microseconds, not milliseconds):
+Fast classification pipeline (millisecond-scale, deterministic):
 
 **Pass 1 — Role-based (instant):**
 - System prompts → primacy
@@ -149,6 +150,14 @@ Simple threshold warnings (Phase 9 adds advanced analytics):
 - Visual indicator on token budget bar
 - Optional toast notification
 
+### 10. Policy + Action Log Foundation
+
+Add a deterministic mutation layer used by later phases:
+- Central policy checks before destructive actions (compress/archive/remove)
+- Structured action log with actor/reason/inputs/results
+- Undo/rollback hooks for reversible operations
+- Event payloads for transparent UI history
+
 ---
 
 ## Key Files to Create/Modify
@@ -167,9 +176,11 @@ Simple threshold warnings (Phase 9 adds advanced analytics):
 | `src-tauri/src/engine/versioning.rs` | **NEW** | Basic edit history |
 | `src-tauri/src/engine/dependency.rs` | **NEW** | Deterministic dep tracking |
 | `src-tauri/src/engine/budget.rs` | **NEW** | Budget threshold alerts |
+| `src-tauri/src/engine/policy.rs` | **NEW** | Mutation policy checks |
+| `src-tauri/src/engine/action_log.rs` | **NEW** | Audit/undo action log |
 | `src-tauri/src/engine/storage.rs` | **NEW** | SQLite persistence layer |
 | `src-tauri/src/commands.rs` | Modify | Add engine IPC commands |
-| `src/lib/stores/context.ts` | Modify | Use real engine data |
+| `src/lib/stores/context.svelte.ts` | Modify | Use real engine data |
 | `src-tauri/Cargo.toml` | Modify | Add `rusqlite` dependency |
 
 ---
@@ -205,7 +216,7 @@ Simple threshold warnings (Phase 9 adds advanced analytics):
 1. Implement staleness scoring algorithm
 2. Implement three-pass classification pipeline
 3. Add content heuristics (error detection, correction patterns)
-4. Performance optimization (target <100μs per classification)
+4. Performance optimization (target <2ms per classification cycle)
 5. Unit tests for pipeline stages
 
 ### Step 5: Session Management (~8k context)
@@ -216,13 +227,14 @@ Simple threshold warnings (Phase 9 adds advanced analytics):
 4. Integrate with proxy (create session on first request)
 5. UI integration for session picker
 
-### Step 6: Versioning, Dependencies & Budget (~10k context)
+### Step 6: Versioning, Dependencies, Budget & Policy (~10k context)
 
 1. Implement basic block versioning (last 5 edits)
 2. Implement deterministic dependency tracking (file refs, conversation flow)
 3. Add simple orphan detection
 4. Implement budget threshold alerts (80%, 90%, 95%)
-5. Unit tests for versioning, deps, and budget
+5. Implement policy checks + structured action logging
+6. Unit tests for versioning, deps, budget, and policy
 
 ---
 
@@ -241,6 +253,8 @@ Simple threshold warnings (Phase 9 adds advanced analytics):
 | `src-tauri/src/engine/versioning.rs` | 4 | Edit history, undo |
 | `src-tauri/src/engine/dependency.rs` | 4 | File refs, orphan detection |
 | `src-tauri/src/engine/budget.rs` | 2 | Threshold alerts |
+| `src-tauri/src/engine/policy.rs` | 2 | Mutation policy checks |
+| `src-tauri/src/engine/action_log.rs` | 2 | Action log/undo records |
 
 ### Integration Tests (~10 tests)
 
@@ -269,12 +283,13 @@ Simple threshold warnings (Phase 9 adds advanced analytics):
 - [ ] Manual pinning works and overrides auto-assignment
 - [ ] Token counts accurate within 2% of official API
 - [ ] Staleness scores calculated and displayed
-- [ ] Classification pipeline runs in <100μs
+- [ ] Classification pipeline runs in <2ms
 - [ ] Multiple sessions tracked concurrently
 - [ ] Session switching works in UI
 - [ ] Basic block versioning with undo works
 - [ ] Deterministic dependency tracking detects file references
 - [ ] Budget alerts trigger at 80%, 90%, 95%
+- [ ] Policy checks gate destructive actions with logged reasons
 - [ ] `make check` passes
 - [ ] 50+ unit tests passing
 - [ ] 10+ integration tests passing
@@ -292,6 +307,8 @@ use crate::engine::staleness::calculate_staleness;
 use crate::engine::versioning::{BlockVersion, VersionHistory};
 use crate::engine::dependency::{DependencyGraph, DependencyEdge};
 use crate::engine::budget::{BudgetAlert, check_budget_thresholds};
+use crate::engine::policy::PolicyEngine;
+use crate::engine::action_log::{ActionLog, ActionRecord};
 ```
 
 ---

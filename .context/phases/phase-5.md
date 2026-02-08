@@ -1,9 +1,9 @@
-# Phase 5: Checkpoints & Forking
+# Phase 5: Memory Lifecycle, Checkpoints & Forking
 
 **Status**: PENDING
-**Goal**: Hard/soft checkpoints, context forking, ghost blocks, and recently deleted trash
+**Goal**: Non-destructive memory lifecycle (hot/warm/cold), archive/recall, checkpoints, forking, ghost blocks, and trash recovery
 **Prerequisites**: Phase 4 complete
-**Estimated Scope**: ~50k context
+**Estimated Scope**: ~55k context
 
 ---
 
@@ -30,17 +30,43 @@ use crate::engine::dedup::find_duplicates;
 
 ## Problem Statement
 
-1. **No state snapshots** — Can't save and restore context state
-2. **No session continuity** — Context lost between sessions
-3. **No experimentation** — Can't branch context for A/B exploration
-4. **No deletion recovery** — Removed blocks are gone forever
-5. **No conversational flow** — Removed blocks leave unexplained gaps
+1. **No memory lifecycle** — No hot/warm/cold/archive state model
+2. **No recall path** — Archived context cannot be quickly recovered by topic/query
+3. **No state snapshots** — Can't save and restore context state
+4. **No experimentation** — Can't branch context for A/B exploration
+5. **No deletion recovery** — Removed blocks are gone forever
+6. **No conversational flow** — Removed blocks leave unexplained gaps
 
 ---
 
 ## Deliverables
 
-### 1. Hard Checkpoints
+### 1. Memory Lifecycle State Machine
+
+Introduce deterministic lifecycle transitions:
+- `hot` (expanded, in active prompt window)
+- `warm` (compressed but still in active context)
+- `cold` (out of active context, quick recall metadata retained)
+- `archived` (offloaded, recallable, not deleted)
+
+Rules:
+- Keep originals preserved locally at all times
+- Transition by policy/action log (from Phase 2), never silent mutation
+- Every transition is reversible (undo or recall)
+
+### 2. Context Manifest + Recall
+
+Generate a compact manifest to expose current memory state:
+- Block/zone counts, token budget, compressed/archived counts
+- Active topic focus + recent transitions
+- Recall hints (`topic`, `file`, `block-id`)
+
+Recall primitives:
+- `recall(topic)`
+- `recall(block-id)`
+- `recall(query)` for keyword or semantic recall (Phase 8 improves retrieval)
+
+### 3. Hard Checkpoints
 
 Exact byte-for-byte snapshots:
 - Full context state at a moment in time
@@ -59,7 +85,7 @@ pub struct HardCheckpoint {
 }
 ```
 
-### 2. Soft Checkpoints
+### 4. Soft Checkpoints
 
 Intelligent summaries for cross-session use:
 - Condensed conversation summary
@@ -83,7 +109,7 @@ pub struct SoftCheckpoint {
 }
 ```
 
-### 3. Auto-Checkpointing
+### 5. Auto-Checkpointing
 
 Automatic saves at meaningful boundaries:
 - Subtask completion (detected via TODO patterns)
@@ -92,7 +118,7 @@ Automatic saves at meaningful boundaries:
 - Topic shifts (cluster change)
 - Configurable triggers
 
-### 4. Context Forking
+### 6. Context Forking
 
 Branch context at decision points:
 - Fork creates independent copy
@@ -103,7 +129,7 @@ Branch context at decision points:
 
 Use case: "WebSockets vs SSE?" — fork, explore both, pick winner
 
-### 5. Ghost Blocks
+### 7. Ghost Blocks
 
 Minimal placeholders for removed blocks:
 ```
@@ -116,7 +142,7 @@ Ghost: [config.py was read here — 847 tokens, removed at 2:34 PM]
 - Visually distinct (heavy dither, barely there)
 - Can expand to compressed version if in trash
 
-### 6. Recently Deleted (Trash)
+### 8. Recently Deleted (Trash)
 
 Recovery system for removed blocks:
 - All removals go to trash first
@@ -132,6 +158,9 @@ Recovery system for removed blocks:
 
 | File | Action | Purpose |
 |------|--------|---------|
+| `src-tauri/src/engine/memory.rs` | **NEW** | Lifecycle state machine + transitions |
+| `src-tauri/src/engine/manifest.rs` | **NEW** | Context manifest generation |
+| `src-tauri/src/engine/recall.rs` | **NEW** | Archive recall API |
 | `src-tauri/src/engine/checkpoint.rs` | **NEW** | Checkpoint system |
 | `src-tauri/src/engine/checkpoint/hard.rs` | **NEW** | Hard checkpoint logic |
 | `src-tauri/src/engine/checkpoint/soft.rs` | **NEW** | Soft checkpoint generation |
@@ -148,7 +177,15 @@ Recovery system for removed blocks:
 
 ## Implementation Steps
 
-### Step 1: Hard Checkpoints (~12k context)
+### Step 1: Memory Lifecycle + Recall (~12k context)
+
+1. Define lifecycle states and transition rules
+2. Implement archive/offload behavior with metadata retention
+3. Implement recall by topic, id, and keyword
+4. Implement manifest generation from ground truth
+5. Unit tests for transitions and recall
+
+### Step 2: Hard Checkpoints (~10k context)
 
 1. Define HardCheckpoint struct
 2. Implement save (serialize full state)
@@ -156,7 +193,7 @@ Recovery system for removed blocks:
 4. Add checkpoint storage (local filesystem)
 5. Unit tests for save/restore
 
-### Step 2: Soft Checkpoints (~12k context)
+### Step 3: Soft Checkpoints (~10k context)
 
 1. Define SoftCheckpoint struct
 2. Implement summary generation (LLM or rule-based)
@@ -164,7 +201,7 @@ Recovery system for removed blocks:
 4. Add injection into primacy zone
 5. Unit tests for generation
 
-### Step 3: Auto-Checkpointing (~8k context)
+### Step 4: Auto-Checkpointing (~7k context)
 
 1. Define trigger events
 2. Implement pattern detection (TODO, test, topic shift)
@@ -172,7 +209,7 @@ Recovery system for removed blocks:
 4. Create auto-checkpoint indicator
 5. Unit tests for trigger detection
 
-### Step 4: Forking (~10k context)
+### Step 5: Forking (~9k context)
 
 1. Define Fork struct and ForkManager
 2. Implement branch creation
@@ -181,7 +218,7 @@ Recovery system for removed blocks:
 5. Implement merge logic
 6. Unit tests for fork operations
 
-### Step 5: Ghost & Trash (~8k context)
+### Step 6: Ghost & Trash (~7k context)
 
 1. Implement ghost block generation
 2. Implement trash storage
@@ -194,27 +231,32 @@ Recovery system for removed blocks:
 
 ## Test Coverage
 
-### Unit Tests (~30 tests)
+### Unit Tests (~36 tests)
 
 | File | Tests | Focus |
 |------|-------|-------|
+| `src-tauri/src/engine/memory.rs` | 6 | Lifecycle transitions |
+| `src-tauri/src/engine/manifest.rs` | 4 | Manifest generation |
+| `src-tauri/src/engine/recall.rs` | 4 | Recall behavior |
 | `src-tauri/src/engine/checkpoint/hard.rs` | 6 | Save/restore |
 | `src-tauri/src/engine/checkpoint/soft.rs` | 6 | Summary generation |
 | `src-tauri/src/engine/checkpoint/auto.rs` | 4 | Trigger detection |
 | `src-tauri/src/engine/fork.rs` | 8 | Fork operations |
 | `src-tauri/src/engine/trash.rs` | 6 | Trash operations |
 
-### Integration Tests (~6 tests)
+### Integration Tests (~8 tests)
 
 | File | Tests | Focus |
 |------|-------|-------|
+| `tests/integration/test_memory_lifecycle.rs` | 2 | Archive/recall/manifest flow |
 | `tests/integration/test_checkpoint_flow.rs` | 3 | Full checkpoint cycle |
 | `tests/integration/test_fork_flow.rs` | 3 | Fork → edit → merge |
 
-### Manual Tests (6 tests)
+### Manual Tests (7 tests)
 
 | Test | Description |
 |------|-------------|
+| `test_archive_recall` | Archive blocks then recall by topic/query |
 | `test_hard_restore` | Save checkpoint, make changes, restore, verify |
 | `test_soft_inject` | Create soft checkpoint, new session, inject |
 | `test_auto_checkpoint` | Complete task, verify auto-checkpoint |
@@ -226,6 +268,9 @@ Recovery system for removed blocks:
 
 ## Success Criteria
 
+- [ ] Lifecycle transitions (hot/warm/cold/archived) are deterministic and reversible
+- [ ] Manifest reflects ground truth state each turn
+- [ ] Recall restores relevant blocks without data loss
 - [ ] Hard checkpoints save and restore exact state
 - [ ] Soft checkpoints generate useful summaries
 - [ ] Auto-checkpointing triggers at meaningful boundaries
@@ -235,8 +280,8 @@ Recovery system for removed blocks:
 - [ ] Trash stores removed blocks with configurable retention
 - [ ] Restore from trash works to original position
 - [ ] `make check` passes
-- [ ] 30+ unit tests passing
-- [ ] 6+ integration tests passing
+- [ ] 36+ unit tests passing
+- [ ] 8+ integration tests passing
 - [ ] All manual tests documented and passing
 
 ---
@@ -248,4 +293,7 @@ use crate::engine::checkpoint::{HardCheckpoint, SoftCheckpoint, AutoCheckpoint};
 use crate::engine::fork::{Fork, ForkManager};
 use crate::engine::ghost::generate_ghost;
 use crate::engine::trash::{Trash, TrashEntry};
+use crate::engine::memory::{MemoryState, MemoryTransition};
+use crate::engine::manifest::ContextManifest;
+use crate::engine::recall::RecallEngine;
 ```
