@@ -49,7 +49,11 @@ test-rust:
 	cargo test --manifest-path src-tauri/Cargo.toml
 
 assert-frontend-tests:
-	@count=$$(rg --files src tests 2>/dev/null | rg '\.(test|spec)\.(ts|js)$$' | wc -l); \
+	@if command -v rg >/dev/null 2>&1; then \
+		count=$$(rg --files src tests 2>/dev/null | rg '\.(test|spec)\.(ts|js)$$' | wc -l); \
+	else \
+		count=$$(find src tests -type f \( -name '*.test.ts' -o -name '*.spec.ts' -o -name '*.test.js' -o -name '*.spec.js' \) 2>/dev/null | wc -l); \
+	fi; \
 	if [ "$$count" -eq 0 ]; then \
 		echo "✗ No frontend test files found (.test/.spec .ts/.js in src/ or tests/)"; \
 		exit 1; \
