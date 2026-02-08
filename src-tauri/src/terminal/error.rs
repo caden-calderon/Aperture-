@@ -13,6 +13,9 @@ pub enum TerminalError {
 
     #[error("Failed to resize terminal: {0}")]
     ResizeFailed(String),
+
+    #[error("Failed to initialize terminal reader: {0}")]
+    ReaderInitFailed(String),
 }
 
 impl serde::Serialize for TerminalError {

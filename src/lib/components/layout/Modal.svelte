@@ -1,7 +1,11 @@
 <script lang="ts">
   import type { Block, Role, Snapshot } from "$lib/types";
   import { blockTypesStore, zonesStore, editHistoryStore } from "$lib/stores";
+  import ModalActionPanel from "./ModalActionPanel.svelte";
+  import ModalTypeDropdown from "./ModalTypeDropdown.svelte";
+  import { focusTrap } from "$lib/utils";
   import { detectLanguage, highlightCode } from "$lib/utils/syntax";
+  import { resolveTypeSelection } from "$lib/utils/blockTypes";
   import { getPreview } from "$lib/utils/text";
   import { diffLines, type DiffLine } from "$lib/utils/diff";
 
@@ -36,7 +40,6 @@
   }: Props = $props();
 
   let roleDropdownOpen = $state(false);
-  let zoneDropdownOpen = $state(false);
   let isEditing = $state(false);
   let isContentExpanded = $state(false);
   let editContent = $state("");
@@ -205,7 +208,6 @@
       isContentExpanded = false;
       editContent = "";
       roleDropdownOpen = false;
-      zoneDropdownOpen = false;
       diffExpanded = false;
       diffVersionIndex = 0;
       diffSnapshotFilter = null;
@@ -264,10 +266,9 @@
   }
 
   function handleTypeSelect(typeId: string) {
-    const selectedType = blockTypesStore.getTypeById(typeId);
-    const isBuiltIn = selectedType?.isBuiltIn ?? false;
-    const role: Role = isBuiltIn ? (typeId as Role) : "user";
-    onRoleChange?.(role, isBuiltIn ? undefined : typeId);
+    if (!block) return;
+    const { role, blockType } = resolveTypeSelection(typeId, block.role);
+    onRoleChange?.(role, blockType);
     roleDropdownOpen = false;
   }
 
@@ -319,32 +320,17 @@
       class:expanded={isContentExpanded}
       class:diff-expanded={diffExpanded}
       style:--role-color={roleColors[block.role]}
+      use:focusTrap={{ enabled: open, onEscape: onClose }}
     >
       <div class="modal-header">
         <div class="modal-title">
-          <div class="role-dropdown-container">
-            <button
-              class="role-badge role-badge-clickable"
-              onclick={() => roleDropdownOpen = !roleDropdownOpen}
-              title="Click to change type"
-            >
-              {displayLabel.toUpperCase()} <span class="dropdown-arrow">▼</span>
-            </button>
-            {#if roleDropdownOpen}
-              <div class="role-dropdown">
-                {#each blockTypesStore.allTypes as type (type.id)}
-                  <button
-                    class="role-dropdown-item"
-                    class:active={displayTypeId === type.id}
-                    onclick={() => handleTypeSelect(type.id)}
-                  >
-                    <span class="type-dot" style:background={type.color}></span>
-                    {type.label}
-                  </button>
-                {/each}
-              </div>
-            {/if}
-          </div>
+          <ModalTypeDropdown
+            {displayLabel}
+            {displayTypeId}
+            open={roleDropdownOpen}
+            onToggle={() => roleDropdownOpen = !roleDropdownOpen}
+            onSelect={handleTypeSelect}
+          />
           {#if block.metadata.toolName}
             <span class="tool-name">{block.metadata.toolName}</span>
           {/if}
@@ -414,6 +400,8 @@
           {#if isEditing}
             <div class="edit-overlay-container">
               {#if modalSyntaxHtml}
+                <!-- Safe invariant: highlightCode() returns Prism-escaped HTML. -->
+                <!-- eslint-disable-next-line svelte/no-at-html-tags -->
                 <pre class="edit-highlight-layer syntax-highlighted" aria-hidden="true">{@html modalSyntaxHtml}
 </pre>
               {:else}
@@ -440,6 +428,8 @@
               ></textarea>
             </div>
           {:else if modalSyntaxHtml}
+            <!-- Safe invariant: highlightCode() returns Prism-escaped HTML. -->
+            <!-- eslint-disable-next-line svelte/no-at-html-tags -->
             <pre class="syntax-highlighted">{@html modalSyntaxHtml}</pre>
             {#if !isContentExpanded && isContentLong}
               <div class="content-fade"></div>
@@ -529,87 +519,25 @@
         {/if}
       </div>
 
-      <div class="modal-actions">
-        <div class="action-group">
-          <span class="action-label">Zone</span>
-          <div class="zone-dropdown-container">
-            <button
-              class="zone-dropdown-trigger"
-              onclick={() => zoneDropdownOpen = !zoneDropdownOpen}
-            >
-              <span class="zone-dot-small" style:background={zonesStore.getZoneColor(block.zone)}></span>
-              {zoneLabel}
-              <span class="dropdown-arrow">▼</span>
-            </button>
-            {#if zoneDropdownOpen}
-              <div class="zone-dropdown">
-                {#each zonesStore.zonesByDisplayOrder as zone (zone.id)}
-                  <button
-                    class="zone-dropdown-item"
-                    class:active={block.zone === zone.id}
-                    onclick={() => { onMove?.(zone.id as Block["zone"]); zoneDropdownOpen = false; }}
-                  >
-                    <span class="zone-dot-small" style:background={zone.color}></span>
-                    {zone.label}
-                  </button>
-                {/each}
-              </div>
-            {/if}
-          </div>
-        </div>
-
-        <div class="action-group">
-          <span class="action-label">Compression</span>
-          <div class="action-buttons">
-            <button class:active={block.compressionLevel === "original"} onclick={() => onCompress?.("original")}>Original</button>
-            <button class:active={block.compressionLevel === "trimmed"} onclick={() => onCompress?.("trimmed")}>Trimmed</button>
-            <button class:active={block.compressionLevel === "summarized"} onclick={() => onCompress?.("summarized")}>Summarized</button>
-            <button class:active={block.compressionLevel === "minimal"} onclick={() => onCompress?.("minimal")}>Minimal</button>
-          </div>
-        </div>
-
-        <div class="action-group">
-          <span class="action-label">Pin</span>
-          <div class="action-buttons">
-            <button class:active={block.pinned === "top"} onclick={() => onPin?.(block?.pinned === "top" ? null : "top")}>Top</button>
-            <button class:active={block.pinned === "bottom"} onclick={() => onPin?.(block?.pinned === "bottom" ? null : "bottom")}>Bottom</button>
-          </div>
-        </div>
-
-        {#if snapshotDiff || hasEditHistory}
-          <div class="action-group">
-            <span class="action-label">{snapshotDiff ? "Snapshot" : "History"}</span>
-            <div class="snapshot-diff-info">
-              {#if snapshotDiff}
-                {#if snapshotDiff.status === "new"}
-                  <span class="diff-badge diff-badge-new">New</span>
-                  <span class="diff-detail">Not in "{snapshotDiff.snapshotName}"</span>
-                {:else if snapshotDiff.status === "modified"}
-                  <span class="diff-badge diff-badge-modified">Modified</span>
-                  <span class="diff-detail">{snapshotDiff.changes.join(", ")}</span>
-                {:else}
-                  <span class="diff-badge diff-badge-unchanged">Unchanged</span>
-                {/if}
-              {:else if hasEditHistory}
-                <span class="diff-badge diff-badge-history">{versionTimeline.length} version{versionTimeline.length === 1 ? "" : "s"}</span>
-              {/if}
-              {#if hasVersions && !isEditing}
-                <button
-                  class="diff-view-btn"
-                  onclick={() => { diffExpanded = !diffExpanded; diffVersionIndex = 0; }}
-                >{diffExpanded ? "Hide Diff" : "Show Diff"}</button>
-              {/if}
-              {#if onOpenDiff}
-                <button class="diff-view-btn" onclick={() => onOpenDiff?.(block?.zone, block?.id)}>Full Diff</button>
-              {/if}
-            </div>
-          </div>
-        {/if}
-
-        <div class="action-group action-danger">
-          <button class="btn-danger" onclick={onRemove}>Remove Block</button>
-        </div>
-      </div>
+      <ModalActionPanel
+        {block}
+        {zoneLabel}
+        {snapshotDiff}
+        {hasEditHistory}
+        versionCount={versionTimeline.length}
+        {hasVersions}
+        {isEditing}
+        {diffExpanded}
+        onToggleDiff={() => {
+          diffExpanded = !diffExpanded;
+          diffVersionIndex = 0;
+        }}
+        {onMove}
+        {onCompress}
+        {onPin}
+        {onOpenDiff}
+        {onRemove}
+      />
     </div>
   </div>
 {/if}
@@ -675,162 +603,6 @@
     display: flex;
     align-items: center;
     gap: 8px;
-  }
-
-  .role-dropdown-container {
-    position: relative;
-  }
-
-  .role-badge {
-    font-family: var(--font-mono);
-    font-size: 9px;
-    font-weight: 600;
-    padding: 3px 6px;
-    border-radius: 2px;
-    background: color-mix(in srgb, var(--role-color) 18%, transparent);
-    color: var(--role-color);
-    letter-spacing: 0.2px;
-  }
-
-  .role-badge-clickable {
-    cursor: pointer;
-    border: 1px solid transparent;
-    transition: all 0.1s ease;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-  }
-
-  .role-badge-clickable:hover {
-    border-color: var(--role-color);
-    background: color-mix(in srgb, var(--role-color) 25%, transparent);
-  }
-
-  .dropdown-arrow {
-    font-size: 7px;
-    opacity: 0.7;
-  }
-
-  .role-dropdown {
-    position: absolute;
-    top: 100%;
-    left: 0;
-    margin-top: 4px;
-    background: var(--bg-elevated);
-    border: 1px solid var(--border-default);
-    border-radius: 4px;
-    box-shadow: var(--shadow-md);
-    z-index: 100;
-    min-width: 100px;
-    overflow: hidden;
-  }
-
-  .role-dropdown-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    width: 100%;
-    padding: 6px 10px;
-    font-family: var(--font-mono);
-    font-size: 10px;
-    text-align: left;
-    background: transparent;
-    border: none;
-    color: var(--text-secondary);
-    cursor: pointer;
-    transition: background 0.1s ease;
-  }
-
-  .role-dropdown-item:hover {
-    background: var(--bg-hover);
-    color: var(--text-primary);
-  }
-
-  .role-dropdown-item.active {
-    background: var(--accent-subtle);
-    color: var(--text-primary);
-    font-weight: 600;
-  }
-
-  .type-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 1px;
-    flex-shrink: 0;
-  }
-
-  /* Zone dropdown */
-  .zone-dropdown-container {
-    position: relative;
-  }
-
-  .zone-dropdown-trigger {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 4px 8px;
-    font-family: var(--font-mono);
-    font-size: 10px;
-    background: var(--bg-surface);
-    border: 1px solid var(--border-default);
-    border-radius: 3px;
-    color: var(--text-secondary);
-    cursor: pointer;
-    transition: all 0.1s ease;
-  }
-
-  .zone-dropdown-trigger:hover {
-    background: var(--bg-hover);
-    border-color: var(--border-strong);
-    color: var(--text-primary);
-  }
-
-  .zone-dot-small {
-    width: 6px;
-    height: 6px;
-    border-radius: 1px;
-    flex-shrink: 0;
-  }
-
-  .zone-dropdown {
-    position: absolute;
-    top: 100%;
-    left: 0;
-    margin-top: 4px;
-    background: var(--bg-elevated);
-    border: 1px solid var(--border-default);
-    border-radius: 4px;
-    box-shadow: var(--shadow-md);
-    z-index: 100;
-    min-width: 120px;
-    overflow: hidden;
-  }
-
-  .zone-dropdown-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    width: 100%;
-    padding: 6px 10px;
-    font-family: var(--font-mono);
-    font-size: 10px;
-    text-align: left;
-    background: transparent;
-    border: none;
-    color: var(--text-secondary);
-    cursor: pointer;
-    transition: background 0.1s ease;
-  }
-
-  .zone-dropdown-item:hover {
-    background: var(--bg-hover);
-    color: var(--text-primary);
-  }
-
-  .zone-dropdown-item.active {
-    background: var(--accent-subtle);
-    color: var(--text-primary);
-    font-weight: 600;
   }
 
   .tool-name {
@@ -1081,152 +853,6 @@
 
   .edit-textarea-layer:focus {
     box-shadow: inset 0 0 0 1px var(--accent);
-  }
-
-  .modal-actions {
-    padding: 12px 14px;
-    border-top: 1px solid var(--border-subtle);
-    background: var(--bg-surface);
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    flex-shrink: 0;
-  }
-
-  .action-group {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-
-  .action-label {
-    font-size: 9px;
-    text-transform: uppercase;
-    color: var(--text-muted);
-    letter-spacing: 0.4px;
-    width: 72px;
-    flex-shrink: 0;
-  }
-
-  .action-buttons {
-    display: flex;
-    gap: 4px;
-    flex-wrap: wrap;
-  }
-
-  .action-buttons button {
-    font-family: var(--font-mono);
-    font-size: 10px;
-    padding: 4px 8px;
-    border-radius: 3px;
-    border: 1px solid var(--border-default);
-    background: var(--bg-surface);
-    color: var(--text-secondary);
-    cursor: pointer;
-    transition: all 0.1s ease;
-  }
-
-  .action-buttons button:hover {
-    background: var(--bg-hover);
-    border-color: var(--border-strong);
-  }
-
-  .action-buttons button.active {
-    background: var(--text-primary);
-    border-color: var(--text-primary);
-    color: var(--bg-surface);
-  }
-
-  .action-danger {
-    margin-top: 4px;
-    padding-top: 10px;
-    border-top: 1px dashed var(--border-subtle);
-  }
-
-  .btn-danger {
-    font-family: var(--font-mono);
-    font-size: 10px;
-    padding: 5px 10px;
-    border-radius: 3px;
-    border: 1px solid color-mix(in srgb, var(--semantic-danger) 50%, transparent);
-    background: transparent;
-    color: var(--semantic-danger);
-    cursor: pointer;
-    transition: all 0.1s ease;
-  }
-
-  .btn-danger:hover {
-    background: var(--semantic-danger);
-    border-color: var(--semantic-danger);
-    color: var(--bg-surface);
-  }
-
-  /* Snapshot diff info */
-  .snapshot-diff-info {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    flex-wrap: wrap;
-  }
-
-  .diff-badge {
-    font-family: var(--font-mono);
-    font-size: 9px;
-    font-weight: 600;
-    padding: 2px 5px;
-    border-radius: 2px;
-    letter-spacing: 0.2px;
-    flex-shrink: 0;
-  }
-
-  .diff-badge-new {
-    color: var(--semantic-success);
-    background: color-mix(in srgb, var(--semantic-success) 15%, transparent);
-  }
-
-  .diff-badge-modified {
-    color: var(--semantic-warning);
-    background: color-mix(in srgb, var(--semantic-warning) 15%, transparent);
-  }
-
-  .diff-badge-unchanged {
-    color: var(--text-faint);
-    background: var(--bg-inset);
-  }
-
-  .diff-detail {
-    font-family: var(--font-mono);
-    font-size: 9px;
-    color: var(--text-muted);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    max-width: 200px;
-  }
-
-  .diff-view-btn {
-    font-family: var(--font-mono);
-    font-size: 9px;
-    padding: 2px 6px;
-    border-radius: 2px;
-    border: 1px solid var(--border-default);
-    background: var(--bg-surface);
-    color: var(--text-muted);
-    cursor: pointer;
-    transition: all 0.1s ease;
-    margin-left: auto;
-    flex-shrink: 0;
-  }
-
-  .diff-view-btn:hover {
-    background: var(--bg-hover);
-    color: var(--text-primary);
-    border-color: var(--border-strong);
-  }
-
-  .diff-badge-history {
-    color: var(--text-muted);
-    background: var(--bg-inset);
   }
 
   /* Diff expanded modal */

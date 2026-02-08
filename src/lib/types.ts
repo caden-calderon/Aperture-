@@ -37,8 +37,8 @@ export interface BlockMetadata {
 
 export interface Block {
   id: string;
-  role: Role;
-  blockType?: string; // Custom block type ID (for display), falls back to role if not set
+  role: Role; // Canonical API role
+  blockType?: string; // Optional UI taxonomy id; display identity is blockType ?? role
   content: string;
   tokens: number;
   timestamp: Date;

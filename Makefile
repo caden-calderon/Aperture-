@@ -1,4 +1,4 @@
-.PHONY: dev build check lint test test-rust test-ui clean install
+.PHONY: dev build check lint test test-rust test-ui assert-frontend-tests clean install
 
 # ============================================================================
 # Development
@@ -48,7 +48,15 @@ test: test-rust test-ui
 test-rust:
 	cargo test --manifest-path src-tauri/Cargo.toml
 
-test-ui:
+assert-frontend-tests:
+	@count=$$(rg --files src tests 2>/dev/null | rg '\.(test|spec)\.(ts|js)$$' | wc -l); \
+	if [ "$$count" -eq 0 ]; then \
+		echo "✗ No frontend test files found (.test/.spec .ts/.js in src/ or tests/)"; \
+		exit 1; \
+	fi; \
+	echo "✓ Frontend test file guard: $$count file(s)"
+
+test-ui: assert-frontend-tests
 	npm run test
 
 # ============================================================================

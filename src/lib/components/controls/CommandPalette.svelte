@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { focusTrap } from "$lib/utils";
+
   interface Props {
     open?: boolean;
     onClose?: () => void;
@@ -121,7 +123,14 @@
     onkeydown={handleKeydown}
     tabindex="-1"
   >
-    <div class="palette">
+    <div
+      class="palette"
+      use:focusTrap={{
+        enabled: open,
+        onEscape: onClose,
+        initialFocus: () => inputEl,
+      }}
+    >
       <div class="palette-input-wrapper">
         <span class="palette-icon">›</span>
         <input

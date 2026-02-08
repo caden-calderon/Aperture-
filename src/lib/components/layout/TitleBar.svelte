@@ -38,7 +38,6 @@
     </div>
 
     <div class="titlebar-center" data-tauri-drag-region>
-      <!-- svelte-ignore a11y_no_static_element_interactions -->
       <button
         class="title-trigger"
         class:open={showStatus}

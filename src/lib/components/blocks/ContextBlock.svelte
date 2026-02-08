@@ -236,12 +236,16 @@
   {#if showContent}
     <div class="block-content" class:content-expanded={showFullContent} class:has-overflow={isOverflowing}>
       {#if blockMatches.length > 0}
+        <!-- Safe invariant: highlightContent() escapes untrusted text via escapeHtml(). -->
+        <!-- eslint-disable-next-line svelte/no-at-html-tags -->
         <pre bind:this={preRef}>{@html highlightContent(
           showFullContent ? block.content : getPreview(block.content),
           blockMatches.filter(m => showFullContent || m.startPos < 180),
           currentBlockMatch
         )}</pre>
       {:else if syntaxHtml}
+        <!-- Safe invariant: highlightCode() returns Prism-escaped HTML. -->
+        <!-- eslint-disable-next-line svelte/no-at-html-tags -->
         <pre class="syntax-highlighted" bind:this={preRef}>{@html syntaxHtml}</pre>
       {:else}
         <pre bind:this={preRef}>{showFullContent ? block.content : getPreview(block.content)}</pre>

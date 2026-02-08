@@ -9,12 +9,13 @@
 
 import { SvelteSet } from "svelte/reactivity";
 import { contextStore } from "./context.svelte";
+import { matchesDisplayType } from "$lib/utils/blockTypes";
 
 // ============================================================================
 // State
 // ============================================================================
 
-let selectedIds = $state(new SvelteSet<string>());
+const selectedIds = $state(new SvelteSet<string>());
 let _lastSelectedId = $state<string | null>(null);
 let lastSelectedIndex = $state<number | null>(null);
 let focusedId = $state<string | null>(null);
@@ -89,8 +90,10 @@ function selectZone(zone: string): void {
     zoneBlocks.length > 0 ? contextStore.getBlockIndex(zoneBlocks[0].id) : null;
 }
 
-function selectByRole(role: string): void {
-  const matchingBlocks = contextStore.blocks.filter((b) => b.role === role);
+function selectByType(typeId: string): void {
+  const matchingBlocks = contextStore.blocks.filter((b) =>
+    matchesDisplayType(b, typeId)
+  );
   selectedIds.clear();
   for (const b of matchingBlocks) {
     selectedIds.add(b.id);
@@ -99,6 +102,10 @@ function selectByRole(role: string): void {
     matchingBlocks.length > 0
       ? contextStore.getBlockIndex(matchingBlocks[0].id)
       : null;
+}
+
+function selectByRole(role: string): void {
+  selectByType(role);
 }
 
 function deselect(): void {
@@ -165,6 +172,7 @@ export const selectionStore = {
   rangeSelect,
   selectAll,
   selectZone,
+  selectByType,
   selectByRole,
   deselect,
   isSelected,

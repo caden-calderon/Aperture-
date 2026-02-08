@@ -10,10 +10,7 @@ export default defineConfig(async () => ({
   plugins: [sveltekit(), tailwindcss()],
 
   // Vitest configuration
-  test: {
-    // Allow empty test suites during development
-    passWithNoTests: true,
-  },
+  test: {},
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //

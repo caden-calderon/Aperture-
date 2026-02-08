@@ -5,6 +5,10 @@ use thiserror::Error;
 /// Errors that can occur during proxy operations.
 #[derive(Debug, Error)]
 pub enum ProxyError {
+    /// Failed to construct the HTTP client.
+    #[error("failed to build HTTP client: {0}")]
+    ClientBuildFailed(#[source] reqwest::Error),
+
     /// Failed to bind to the specified address.
     #[error("failed to bind to {address}: {source}")]
     BindFailed {

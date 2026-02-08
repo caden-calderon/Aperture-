@@ -11,6 +11,7 @@ import type { contextStore as ContextStoreType } from "$lib/stores/context.svelt
 import type { zonesStore as ZonesStoreType } from "$lib/stores/zones.svelte";
 import type { blockTypesStore as BlockTypesStoreType } from "$lib/stores/blockTypes.svelte";
 import type { Zone as ZoneType, Block } from "$lib/types";
+import { resolveTypeSelection } from "$lib/utils/blockTypes";
 
 interface BlockHandlerStores {
   selectionStore: typeof SelectionStoreType;
@@ -82,13 +83,10 @@ export function createBlockHandlers(stores: BlockHandlerStores) {
     const blockTypeInfo = blockTypesStore.getTypeById(typeId);
     const label = blockTypeInfo?.label ?? typeId;
 
-    // Determine role: built-in types use their ID as role, custom types default to "user"
-    const isBuiltIn = blockTypeInfo?.isBuiltIn ?? false;
-    const role: Block["role"] = isBuiltIn ? (typeId as Block["role"]) : "user";
+    // New blocks default to "user" role unless a built-in role is selected.
+    const { role, blockType } = resolveTypeSelection(typeId, "user");
     const content = `New ${label} block`;
-
-    // Pass blockType for custom types so display knows which type this is
-    const newBlock = contextStore.createBlock(zone, role, content, isBuiltIn ? undefined : typeId);
+    const newBlock = contextStore.createBlock(zone, role, content, blockType);
     selectionStore.select(newBlock.id);
     uiStore.openModal(newBlock.id);
     const zoneName = zonesStore.getZoneById(zone)?.label ?? zone;

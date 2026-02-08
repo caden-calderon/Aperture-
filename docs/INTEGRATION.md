@@ -60,6 +60,18 @@ and the localStorage-to-SQLite migration strategy.
 
 ---
 
+## 1.1 Block Role vs Block Type Semantics
+
+- `role` is canonical API identity and must remain one of:
+  `system | user | assistant | tool_use | tool_result`.
+- `blockType` is optional UI taxonomy identity (custom type ids).
+- Display/filter identity is `blockType ?? role`.
+- Assignment rules:
+  - selecting a built-in type sets `role` and clears `blockType`
+  - selecting a custom type sets `blockType` and preserves existing `role`
+
+---
+
 ## 2. Tauri IPC Command Reference
 
 All commands are registered in `src-tauri/src/lib.rs` via `generate_handler![]`.

@@ -45,6 +45,8 @@ AI Coding Tool (Claude Code, Codex, etc.)
 └──────────────────────────────────┘
 ```
 
+Security baseline for current and future phases: `docs/SECURITY_BASELINE.md`.
+
 ---
 
 ## Three Layers

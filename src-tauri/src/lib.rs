@@ -28,10 +28,17 @@ fn load_env() {
 
 /// Initialize logging with tracing.
 fn init_logging() {
+    let default_filter = if cfg!(debug_assertions) {
+        // Development default: keep crate-level debug visibility for proxy diagnostics.
+        "info,aperture_lib=debug"
+    } else {
+        // Release default: info level without verbose payload previews.
+        "info"
+    };
+
     tracing_subscriber::registry()
         .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| {
-            // Default to info level, with debug for our crate
-            "info,aperture_lib=debug".into()
+            default_filter.into()
         }))
         .with(tracing_subscriber::fmt::layer())
         .init();

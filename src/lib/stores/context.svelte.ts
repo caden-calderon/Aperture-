@@ -7,6 +7,7 @@
  */
 
 import type { Block, Zone, TokenBudget, Snapshot, SnapshotZoneState, Role } from "../types";
+import { isRole } from "../types";
 import {
   generateDemoBlocks,
   generateDemoSnapshots,
@@ -284,9 +285,62 @@ function setBlockRole(blockId: string, role: Role, blockType?: string): void {
   markDirty();
 }
 
-function setBlocksRole(blockIds: string[], role: Role): void {
+function setBlocksRole(blockIds: string[], role: Role, blockType?: string): void {
   const idSet = new Set(blockIds);
-  blocks = blocks.map((b) => (idSet.has(b.id) ? { ...b, role } : b));
+  const nextBlockType = blockType ?? undefined;
+  let changed = false;
+
+  blocks = blocks.map((b) => {
+    if (!idSet.has(b.id)) return b;
+
+    const oldBlockType = b.blockType ?? null;
+    const newBlockType = nextBlockType ?? null;
+    if (b.role === role && oldBlockType === newBlockType) return b;
+
+    editHistoryStore.recordEdit(
+      b.id,
+      "role",
+      { role: b.role, blockType: oldBlockType },
+      { role, blockType: newBlockType }
+    );
+
+    changed = true;
+    return { ...b, role, blockType: nextBlockType };
+  });
+
+  if (!changed) return;
+  blocks = [...blocks];
+  markDirty();
+}
+
+function setBlocksType(blockIds: string[], typeId: string): void {
+  if (isRole(typeId)) {
+    setBlocksRole(blockIds, typeId);
+    return;
+  }
+
+  const idSet = new Set(blockIds);
+  let changed = false;
+
+  blocks = blocks.map((b) => {
+    if (!idSet.has(b.id)) return b;
+
+    const oldBlockType = b.blockType ?? null;
+    if (oldBlockType === typeId) return b;
+
+    editHistoryStore.recordEdit(
+      b.id,
+      "role",
+      { role: b.role, blockType: oldBlockType },
+      { role: b.role, blockType: typeId }
+    );
+
+    changed = true;
+    return { ...b, blockType: typeId };
+  });
+
+  if (!changed) return;
+  blocks = [...blocks];
   markDirty();
 }
 
@@ -537,6 +591,7 @@ export const contextStore = {
   updateBlockContent,
   setBlockRole,
   setBlocksRole,
+  setBlocksType,
   reorderBlock,
   reorderBlocksInZone,
   setCompressionLevel,

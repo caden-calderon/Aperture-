@@ -9,6 +9,9 @@ export { default as Sparkline } from "./blocks/Sparkline.svelte";
 
 // layout/
 export { default as Modal } from "./layout/Modal.svelte";
+export { default as ModalActionPanel } from "./layout/ModalActionPanel.svelte";
+export { default as ModalTypeDropdown } from "./layout/ModalTypeDropdown.svelte";
+export { default as ModalZoneDropdown } from "./layout/ModalZoneDropdown.svelte";
 export { default as TerminalPanel } from "./layout/TerminalPanel.svelte";
 export { default as TitleBar } from "./layout/TitleBar.svelte";
 export { default as ZoneManager } from "./layout/ZoneManager.svelte";
@@ -23,6 +26,9 @@ export { default as BlockTypeManager } from "./controls/BlockTypeManager.svelte"
 
 // features/
 export { default as ContextDiff } from "./features/ContextDiff.svelte";
+export { default as ContextDiffEntry } from "./features/ContextDiffEntry.svelte";
+export { default as ContextDiffSelector } from "./features/ContextDiffSelector.svelte";
+export { default as ContextDiffStats } from "./features/ContextDiffStats.svelte";
 export { default as ZoneMinimap } from "./features/ZoneMinimap.svelte";
 export { default as Terminal } from "./features/Terminal.svelte";
 

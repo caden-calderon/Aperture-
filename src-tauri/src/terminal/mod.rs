@@ -75,7 +75,7 @@ pub fn spawn_shell(
         .map_err(|e| TerminalError::SpawnFailed(e.to_string()))?;
 
     let session_id = Uuid::new_v4().to_string();
-    let session = TerminalSession::new(session_id.clone(), child, writer, pair.master, app);
+    let session = TerminalSession::new(session_id.clone(), child, writer, pair.master, app)?;
 
     let mut sessions = state
         .sessions

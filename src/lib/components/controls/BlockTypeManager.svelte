@@ -1,6 +1,7 @@
 <script lang="ts">
   import { blockTypesStore, type BlockType } from '$lib/stores';
   import { contextStore, selectionStore, uiStore } from '$lib/stores';
+  import { isBuiltInType, matchesDisplayType } from '$lib/utils/blockTypes';
 
   let expanded = $state(true);
   let showAddDialog = $state(false);
@@ -18,11 +19,12 @@
 
   // Get token count for a block type
   function getTokenCount(typeId: string): number {
-    const budget = contextStore.tokenBudget;
-    if (typeId in budget.byRole) {
-      return budget.byRole[typeId as keyof typeof budget.byRole];
+    if (isBuiltInType(typeId)) {
+      return contextStore.tokenBudget.byRole[typeId];
     }
-    return 0;
+    return contextStore.blocks
+      .filter((block) => matchesDisplayType(block, typeId))
+      .reduce((sum, block) => sum + block.tokens, 0);
   }
 
   function handleAdd() {
@@ -79,23 +81,23 @@
     resetForm();
   }
 
-  import type { Role } from '$lib/types';
-
   // Click on type: assign selected blocks OR select all blocks of that type
   function handleTypeClick(typeId: string) {
+    const label = blockTypesStore.getTypeById(typeId)?.label ?? typeId;
+
     if (selectionStore.hasSelection) {
-      // Assign selected blocks to this role
-      contextStore.setBlocksRole([...selectionStore.selectedIds], typeId as Role);
+      // Assign selected blocks to this display type
+      contextStore.setBlocksType([...selectionStore.selectedIds], typeId);
       const count = selectionStore.count;
-      uiStore.showToast(`Assigned ${count} block(s) to ${typeId}`, 'success');
+      uiStore.showToast(`Assigned ${count} block(s) to ${label}`, 'success');
     } else {
       // Select all blocks of this type
-      selectionStore.selectByRole(typeId);
+      selectionStore.selectByType(typeId);
       const count = selectionStore.count;
       if (count > 0) {
-        uiStore.showToast(`Selected ${count} ${typeId} block(s)`, 'info');
+        uiStore.showToast(`Selected ${count} ${label} block(s)`, 'info');
       } else {
-        uiStore.showToast(`No ${typeId} blocks found`, 'info');
+        uiStore.showToast(`No ${label} blocks found`, 'info');
       }
     }
   }

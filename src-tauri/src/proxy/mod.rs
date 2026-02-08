@@ -49,37 +49,29 @@ pub struct ProxyState {
 }
 
 impl ProxyState {
+    fn build_client(builder: reqwest::ClientBuilder) -> Result<Client, ProxyError> {
+        builder.build().map_err(ProxyError::ClientBuildFailed)
+    }
+
     /// Create new proxy state with default configuration.
-    pub fn new() -> Self {
-        let client = Client::builder()
-            .timeout(Duration::from_secs(120))
-            .build()
-            .expect("failed to build HTTP client");
-        Self {
+    pub fn new() -> Result<Self, ProxyError> {
+        let client = Self::build_client(Client::builder().timeout(Duration::from_secs(120)))?;
+        Ok(Self {
             client,
             config: UpstreamConfig::default(),
-        }
+        })
     }
 
     /// Create proxy state with custom upstream configuration.
-    pub fn with_config(config: UpstreamConfig) -> Self {
-        let client = Client::builder()
-            .timeout(Duration::from_secs(120))
-            .build()
-            .expect("failed to build HTTP client");
-        Self { client, config }
-    }
-}
-
-impl Default for ProxyState {
-    fn default() -> Self {
-        Self::new()
+    pub fn with_config(config: UpstreamConfig) -> Result<Self, ProxyError> {
+        let client = Self::build_client(Client::builder().timeout(Duration::from_secs(120)))?;
+        Ok(Self { client, config })
     }
 }
 
 /// Start the proxy server.
 pub async fn start_proxy(port: u16) -> Result<(), ProxyError> {
-    let state = Arc::new(ProxyState::new());
+    let state = Arc::new(ProxyState::new()?);
 
     let app = Router::new()
         .route("/{*path}", any(handler::proxy_handler))
@@ -104,4 +96,29 @@ pub async fn start_proxy(port: u16) -> Result<(), ProxyError> {
         })?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_proxy_state_with_config_uses_custom_urls() {
+        let config = UpstreamConfig {
+            anthropic_url: "https://example-anthropic.invalid".to_string(),
+            openai_url: "https://example-openai.invalid".to_string(),
+        };
+
+        let state = ProxyState::with_config(config.clone()).expect("should build client");
+        assert_eq!(state.config.anthropic_url, config.anthropic_url);
+        assert_eq!(state.config.openai_url, config.openai_url);
+    }
+
+    #[test]
+    fn test_build_client_maps_reqwest_builder_errors() {
+        let builder = Client::builder().user_agent("invalid\nuser-agent");
+        let result = ProxyState::build_client(builder);
+
+        assert!(matches!(result, Err(ProxyError::ClientBuildFailed(_))));
+    }
 }
